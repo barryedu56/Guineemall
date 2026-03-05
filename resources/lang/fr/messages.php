@@ -1,0 +1,56 @@
+<?php
+
+return [
+    'orders' => [
+        'empty_cart' => 'Votre panier est vide.',
+        'order_created' => 'Commande créée avec succès! Votre commande #:id est en attente de confirmation.',
+        'order_cancelled' => 'Commande annulée avec succès.',
+        'order_error' => 'Une erreur technique est survenue. Veuillez réessayer.',
+        'stock_error' => 'Problème de stock: :message',
+        'order_exception' => 'Erreur de commande: :message',
+    ],
+    'cart' => [
+        'product_unavailable' => 'Ce produit n\'est pas disponible.',
+        'quantity_exceeds_stock' => 'Quantité supérieure au stock disponible.',
+        'quantity_unavailable' => 'Quantité non disponible. Stock disponible: :stock',
+        'added' => 'Produit ajouté au panier avec succès!',
+        'updated' => 'Panier mis à jour avec succès.',
+        'removed' => 'Produit retiré du panier.',
+        'cleared' => 'Panier vidé avec succès.',
+        'empty' => 'Votre panier est vide. Ajoutez des produits avant de finaliser votre commande.',
+    ],
+    'vendor' => [
+        'profile_required' => 'Vous devez d\'abord créer votre boutique.',
+        'profile_created' => 'Boutique créée avec succès. Elle est en attente de validation.',
+        'profile_updated' => 'Profil mis à jour avec succès.',
+        'logo_deleted' => 'Logo supprimé avec succès.',
+        'password_updated' => 'Mot de passe mis à jour avec succès.',
+        'no_shop' => 'Aucune boutique associée',
+    ],
+    'vendor_orders' => [
+        'status_updated' => 'Statut de la commande mis à jour avec succès.',
+        'confirmed' => 'Commande confirmée avec succès.',
+        'preparing' => 'Commande marquée comme en préparation.',
+        'ready' => 'Commande marquée comme prête pour livraison.',
+        'delivered' => 'Commande marquée comme livrée.',
+        'cancelled' => 'Commande annulée avec succès.',
+    ],
+    'favorites' => [
+        'added' => 'Produit ajouté aux favoris',
+        'removed' => 'Produit retiré des favoris',
+    ],
+    'notifications' => [
+        'vendor_approved_title' => 'Boutique approuvée',
+        'vendor_approved_message' => 'Votre boutique ":shop" a été approuvée. Vous pouvez commencer à vendre.',
+        'vendor_approved_action' => 'Accéder au tableau de bord',
+        'product_rejected_title' => 'Produit désactivé',
+        'product_rejected_message' => 'Votre produit ":product" a été désactivé par un administrateur.',
+        'product_rejected_action' => 'Voir le produit',
+        'order_status_title' => 'Mise à jour de commande',
+        'order_status_message' => 'Votre commande #:id est maintenant : :status.',
+        'order_status_action' => 'Voir la commande',
+        'new_order_title' => 'Nouvelle commande',
+        'new_order_message' => 'Vous avez reçu une nouvelle commande #:id.',
+        'new_order_action' => 'Voir la commande',
+    ],
+];

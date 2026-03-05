@@ -1,0 +1,56 @@
+<?php
+
+return [
+    'orders' => [
+        'empty_cart' => 'Your cart is empty.',
+        'order_created' => 'Order created successfully! Your order #:id is pending confirmation.',
+        'order_cancelled' => 'Order cancelled successfully.',
+        'order_error' => 'A technical error occurred. Please try again.',
+        'stock_error' => 'Stock issue: :message',
+        'order_exception' => 'Order error: :message',
+    ],
+    'cart' => [
+        'product_unavailable' => 'This product is not available.',
+        'quantity_exceeds_stock' => 'Quantity exceeds available stock.',
+        'quantity_unavailable' => 'Quantity not available. Available stock: :stock',
+        'added' => 'Product added to cart successfully!',
+        'updated' => 'Cart updated successfully.',
+        'removed' => 'Product removed from cart.',
+        'cleared' => 'Cart cleared successfully.',
+        'empty' => 'Your cart is empty. Add products before checkout.',
+    ],
+    'vendor' => [
+        'profile_required' => 'You must create your shop first.',
+        'profile_created' => 'Shop created successfully. It is pending approval.',
+        'profile_updated' => 'Profile updated successfully.',
+        'logo_deleted' => 'Logo deleted successfully.',
+        'password_updated' => 'Password updated successfully.',
+        'no_shop' => 'No shop associated',
+    ],
+    'vendor_orders' => [
+        'status_updated' => 'Order status updated successfully.',
+        'confirmed' => 'Order confirmed successfully.',
+        'preparing' => 'Order marked as preparing.',
+        'ready' => 'Order marked as ready for delivery.',
+        'delivered' => 'Order marked as delivered.',
+        'cancelled' => 'Order cancelled successfully.',
+    ],
+    'favorites' => [
+        'added' => 'Product added to favorites',
+        'removed' => 'Product removed from favorites',
+    ],
+    'notifications' => [
+        'vendor_approved_title' => 'Shop approved',
+        'vendor_approved_message' => 'Your shop ":shop" has been approved. You can start selling.',
+        'vendor_approved_action' => 'Go to dashboard',
+        'product_rejected_title' => 'Product deactivated',
+        'product_rejected_message' => 'Your product ":product" has been deactivated by an admin.',
+        'product_rejected_action' => 'View product',
+        'order_status_title' => 'Order status update',
+        'order_status_message' => 'Your order #:id is now :status.',
+        'order_status_action' => 'View order',
+        'new_order_title' => 'New order',
+        'new_order_message' => 'You received a new order #:id.',
+        'new_order_action' => 'View order',
+    ],
+];

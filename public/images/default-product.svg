@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <rect width="400" height="400" fill="#f3f4f6"/>
+  <rect x="60" y="60" width="280" height="280" fill="#e5e7eb" stroke="#d1d5db" stroke-width="4"/>
+  <rect x="95" y="95" width="210" height="210" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+  <circle cx="160" cy="170" r="28" fill="#d1d5db"/>
+  <path d="M110 300 L190 210 L240 260 L280 220 L330 300 Z" fill="#d1d5db"/>
+  <text x="200" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#9ca3af">
+    Produit
+  </text>
+</svg>

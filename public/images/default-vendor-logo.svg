@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <rect width="400" height="400" fill="#ecfdf5"/>
+  <rect x="70" y="120" width="260" height="200" rx="12" fill="#10b981"/>
+  <rect x="110" y="170" width="60" height="60" fill="#ffffff" opacity="0.9"/>
+  <rect x="190" y="170" width="60" height="60" fill="#ffffff" opacity="0.9"/>
+  <rect x="270" y="170" width="60" height="60" fill="#ffffff" opacity="0.9"/>
+  <rect x="140" y="90" width="120" height="40" rx="8" fill="#059669"/>
+  <text x="200" y="350" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#047857">
+    Boutique
+  </text>
+</svg>

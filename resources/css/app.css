@@ -1,0 +1,311 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   GUINÉE MALL - THEME E-COMMERCE MODERNE
+   Palette: Jaune #FFC107 | Orange #FFA726
+   ============================================ */
+
+@layer base {
+  :root {
+    /* Couleurs principales */
+    --color-primary: #FFC107;
+    --color-primary-hover: #FFB300;
+    --color-primary-light: #FFE082;
+    --color-primary-dark: #FF8F00;
+    
+    /* Couleurs secondaires */
+    --color-secondary: #FFA726;
+    --color-secondary-hover: #FF9800;
+    --color-secondary-light: #FFCC80;
+    --color-secondary-dark: #EF6C00;
+    
+    /* Couleurs de surface */
+    --color-surface: #FFFFFF;
+    --color-background: #F8F9FA;
+    --color-text: #212529;
+    --color-text-muted: #6C757D;
+    --color-border: #E9ECEF;
+    
+    /* Ombres */
+    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+    --shadow-card-hover: 0 8px 24px rgba(255, 193, 7, 0.15);
+    --shadow-button: 0 4px 12px rgba(255, 193, 7, 0.25);
+    --shadow-button-hover: 0 6px 16px rgba(255, 167, 38, 0.35);
+    --shadow-glow: 0 0 20px rgba(255, 193, 7, 0.3);
+    
+    /* Transitions */
+    --transition-fast: 150ms ease-in-out;
+    --transition-normal: 250ms ease-in-out;
+    --transition-slow: 350ms ease-in-out;
+  }
+}
+
+@layer components {
+  /* ============================================
+     CARTES PRODUITS E-COMMERCE
+     ============================================ */
+  .product-card {
+    @apply bg-white rounded-xl overflow-hidden transition-all duration-normal;
+    box-shadow: var(--shadow-card);
+  }
+  
+  .product-card:hover {
+    @apply transform -translate-y-1;
+    box-shadow: var(--shadow-card-hover);
+  }
+  
+  .product-card-image {
+    @apply relative overflow-hidden;
+  }
+  
+  .product-card-image img {
+    @apply transition-transform duration-slow;
+  }
+  
+  .product-card:hover .product-card-image img {
+    @apply scale-105;
+  }
+  
+  .product-price {
+    @apply text-2xl font-bold text-primary;
+  }
+  
+  .product-price-old {
+    @apply text-sm text-text-muted line-through mr-2;
+  }
+  
+  /* ============================================
+     BOUTONS E-COMMERCE
+     ============================================ */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-primary text-gray-900 font-semibold rounded-lg transition-all duration-normal;
+    box-shadow: var(--shadow-button);
+  }
+  
+  .btn-primary:hover {
+    @apply bg-primary-hover transform scale-105;
+    box-shadow: var(--shadow-button-hover);
+  }
+  
+  .btn-primary:active {
+    @apply transform scale-95;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-secondary text-white font-semibold rounded-lg transition-all duration-normal;
+  }
+  
+  .btn-secondary:hover {
+    @apply bg-secondary-hover transform scale-105;
+    box-shadow: var(--shadow-button-hover);
+  }
+  
+  .btn-outline {
+    @apply inline-flex items-center justify-center px-6 py-3 border-2 border-primary text-gray-900 font-semibold rounded-lg transition-all duration-normal;
+  }
+  
+  .btn-outline:hover {
+    @apply bg-primary text-gray-900;
+  }
+  
+  /* ============================================
+     BADGES ET ÉTIQUETTES
+     ============================================ */
+  .badge-promo {
+    @apply inline-flex items-center px-3 py-1 bg-primary text-gray-900 text-xs font-bold rounded-full;
+  }
+  
+  .badge-new {
+    @apply inline-flex items-center px-3 py-1 bg-secondary text-white text-xs font-bold rounded-full;
+  }
+  
+  .badge-stock {
+    @apply inline-flex items-center px-2 py-1 bg-background text-text-muted text-xs rounded-md;
+  }
+  
+  /* ============================================
+     HEADER ET NAVIGATION
+     ============================================ */
+  .header-ecommerce {
+    @apply bg-white sticky top-0 z-50;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+  }
+  
+  .search-bar {
+    @apply w-full max-w-2xl px-5 py-3 bg-background border border-border rounded-full transition-all duration-normal;
+  }
+  
+  .search-bar:focus {
+    @apply outline-none border-primary;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.15);
+  }
+  
+  /* ============================================
+     DASHBOARD ET ADMIN
+     ============================================ */
+  .stat-card {
+    @apply bg-white p-6 rounded-xl transition-all duration-normal;
+    box-shadow: var(--shadow-card);
+  }
+  
+  .stat-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+  
+  .stat-value {
+    @apply text-3xl font-bold text-gray-900;
+  }
+  
+  .stat-label {
+    @apply text-sm text-text-muted mt-1;
+  }
+  
+  .stat-icon {
+    @apply w-12 h-12 flex items-center justify-center rounded-xl bg-primary-light text-primary;
+  }
+  
+  /* ============================================
+     FORMULAIRES E-COMMERCE
+     ============================================ */
+  .form-input {
+    @apply w-full px-4 py-3 bg-white border border-border rounded-lg transition-all duration-fast;
+  }
+  
+  .form-input:focus {
+    @apply outline-none border-primary;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.15);
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-gray-900 mb-2;
+  }
+}
+
+@layer utilities {
+  /* ============================================
+     ANIMATIONS PERSONNALISÉES
+     ============================================ */
+  .animate-on-scroll {
+    @apply opacity-0 translate-y-4;
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  
+  .animate-on-scroll.visible {
+    @apply opacity-100 translate-y-0;
+  }
+  
+  .hover-lift {
+    @apply transition-transform duration-normal;
+  }
+  
+  .hover-lift:hover {
+    @apply -translate-y-2;
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-fast;
+  }
+  
+  .hover-scale:hover {
+    @apply scale-105;
+  }
+  
+  .hover-glow {
+    transition: box-shadow var(--transition-normal);
+  }
+  
+  .hover-glow:hover {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  /* ============================================
+     GRADIENTS
+     ============================================ */
+  .gradient-primary {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  }
+  
+  .gradient-primary-light {
+    background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-secondary-light) 100%);
+  }
+  
+  /* ============================================
+     EFFETS DE TEXTE
+     ============================================ */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* ============================================
+     RESPONSIVE UTILITIES
+     ============================================ */
+  @screen md {
+    .product-grid {
+      @apply grid-cols-3;
+    }
+  }
+  
+  @screen lg {
+    .product-grid {
+      @apply grid-cols-4;
+    }
+  }
+}
+
+/* ============================================
+   COMPTEURS ANIMÉS
+   ============================================ */
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-count {
+  animation: countUp 0.5s ease-out forwards;
+}
+
+/* ============================================
+   PULSE POUR BOUTONS IMPORTANTS
+   ============================================ */
+@keyframes pulse-subtle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.pulse-button {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* ============================================
+   LOADING SKELETON
+   ============================================ */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
