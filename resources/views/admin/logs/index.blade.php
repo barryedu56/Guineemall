@@ -24,10 +24,10 @@
 
     <!-- Filtres -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <form method="GET" class="flex flex-wrap gap-4 items-end">
+        <form method="GET" id="filterForm" class="flex flex-wrap gap-4 items-end">
             <div class="flex-1 min-w-48">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Filtrer par admin</label>
-                <select name="admin_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white">
+                <select name="admin_id" id="adminFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white">
                     <option value="">Tous les admins</option>
                     @foreach($admins ?? [] as $admin)
                         <option value="{{ $admin->id }}" {{ request('admin_id') == $admin->id ? 'selected' : '' }}>
@@ -39,18 +39,18 @@
             
             <div class="flex-1 min-w-64">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Rechercher une action</label>
-                <input type="text" name="action" value="{{ request('action') }}" 
+                <input type="text" name="action" id="actionFilter" value="{{ request('action') }}" 
                        placeholder="Ex: création, suppression, blocage..."
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
             </div>
             
             <div class="flex gap-2">
-                <button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center">
+                <button type="submit" onclick="console.log('Bouton filtrer cliqué')" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center">
                     <i class="fas fa-search mr-2"></i>Filtrer
                 </button>
-                <a href="{{ route('admin.logs.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">
+                <button type="button" id="resetBtn" onclick="resetFilters()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">
                     <i class="fas fa-times mr-2"></i>Réinitialiser
-                </a>
+                </button>
             </div>
         </form>
     </div>
@@ -147,3 +147,48 @@
         return $action;
     }
 @endphp
+
+@section('scripts')
+<script>
+// Fonction simple pour réinitialiser les filtres
+function resetFilters() {
+    console.log('resetFilters appelé');
+    window.location.href = '{{ route("admin.logs.index") }}';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('JavaScript chargé pour les filtres');
+    
+    const filterForm = document.getElementById('filterForm');
+    const resetBtn = document.getElementById('resetBtn');
+    const adminFilter = document.getElementById('adminFilter');
+    const actionFilter = document.getElementById('actionFilter');
+    
+    console.log('Éléments trouvés:', {
+        filterForm: !!filterForm,
+        resetBtn: !!resetBtn,
+        adminFilter: !!adminFilter,
+        actionFilter: !!actionFilter
+    });
+    
+    // Gérer le bouton de réinitialisation (backup)
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function(e) {
+            console.log('Bouton réinitialiser cliqué via addEventListener');
+            e.preventDefault();
+            window.location.href = '{{ route("admin.logs.index") }}';
+        });
+    }
+    
+    // Filtrage automatique lors du changement de sélection
+    if (adminFilter) {
+        adminFilter.addEventListener('change', function() {
+            console.log('Admin filter changed:', this.value);
+            if (filterForm) {
+                filterForm.submit();
+            }
+        });
+    }
+});
+</script>
+@endsection

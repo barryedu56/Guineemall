@@ -35,6 +35,15 @@ class AdminLogController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Debug temporaire - à supprimer après test
+        if ($request->hasAny(['admin_id', 'action'])) {
+            \Log::info('Filtres appliqués:', [
+                'admin_id' => $request->admin_id,
+                'action' => $request->action,
+                'results_count' => $logs->count()
+            ]);
+        }
+
         return view('admin.logs.index', compact('logs', 'admins'));
     }
 

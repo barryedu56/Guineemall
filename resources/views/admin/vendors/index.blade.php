@@ -117,6 +117,17 @@
                                                 </button>
                                             </form>
                                         @endif
+                                        
+                                        <!-- Bouton Suppression -->
+                                        <form method="POST" action="{{ route('admin.vendors.destroy', $vendor) }}" 
+                                              onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer définitivement ce vendeur et toutes ses données ? Cette action est irréversible.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="admin-link text-red-600 hover:text-red-700">
+                                                <i class="fas fa-trash"></i>
+                                                Supprimer
+                                            </button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>

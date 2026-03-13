@@ -145,6 +145,70 @@
                 </div>
             </div>
 
+            <!-- Authentification -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Authentification</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                            Mot de passe *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="admin-input"
+                            required
+                            placeholder="Définir un mot de passe sécurisé"
+                        />
+                        @error('password')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        <p class="mt-2 text-sm text-gray-500">
+                            Minimum 8 caractères. Laissez vide pour générer automatiquement.
+                        </p>
+                    </div>
+                    
+                    <div>
+                        <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-2">
+                            Confirmation du mot de passe *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="password_confirmation" 
+                            name="password_confirmation" 
+                            class="admin-input"
+                            required
+                            placeholder="Confirmer le mot de passe"
+                        />
+                        @error('password_confirmation')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+                
+                <!-- Option de génération automatique -->
+                <div class="mt-4">
+                    <div class="flex items-center">
+                        <input 
+                            type="checkbox" 
+                            id="generate_password" 
+                            name="generate_password" 
+                            value="1"
+                            class="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                            onchange="togglePasswordFields()"
+                        >
+                        <label for="generate_password" class="ml-2 block text-sm text-gray-700">
+                            Générer automatiquement un mot de passe sécurisé
+                        </label>
+                    </div>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Si coché, un mot de passe sécurisé sera généré et envoyé au vendeur par email.
+                    </p>
+                </div>
+            </div>
+
             <!-- Actions -->
             <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
                 <a href="{{ route('admin.vendors.index') }}" class="admin-btn admin-btn-secondary">
@@ -158,4 +222,64 @@
         </form>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+function togglePasswordFields() {
+    const generateCheckbox = document.getElementById('generate_password');
+    const passwordField = document.getElementById('password');
+    const passwordConfirmField = document.getElementById('password_confirmation');
+    
+    if (generateCheckbox.checked) {
+        // Désactiver les champs mot de passe si génération automatique
+        passwordField.disabled = true;
+        passwordField.required = false;
+        passwordField.value = '';
+        
+        passwordConfirmField.disabled = true;
+        passwordConfirmField.required = false;
+        passwordConfirmField.value = '';
+        
+        // Ajouter une indication visuelle
+        passwordField.placeholder = 'Sera généré automatiquement';
+        passwordConfirmField.placeholder = 'Sera généré automatiquement';
+    } else {
+        // Réactiver les champs si génération manuelle
+        passwordField.disabled = false;
+        passwordField.required = true;
+        passwordField.placeholder = 'Définir un mot de passe sécurisé';
+        
+        passwordConfirmField.disabled = false;
+        passwordConfirmField.required = true;
+        passwordConfirmField.placeholder = 'Confirmer le mot de passe';
+    }
+}
+
+// Validation personnalisée pour le formulaire
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const generateCheckbox = document.getElementById('generate_password');
+    
+    form.addEventListener('submit', function(e) {
+        if (!generateCheckbox.checked) {
+            const password = document.getElementById('password').value;
+            const passwordConfirm = document.getElementById('password_confirmation').value;
+            
+            // Validation basique du mot de passe
+            if (password.length < 8) {
+                e.preventDefault();
+                alert('Le mot de passe doit contenir au moins 8 caractères.');
+                return false;
+            }
+            
+            if (password !== passwordConfirm) {
+                e.preventDefault();
+                alert('Les mots de passe ne correspondent pas.');
+                return false;
+            }
+        }
+    });
+});
+</script>
 @endsection

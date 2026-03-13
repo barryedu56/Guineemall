@@ -192,6 +192,9 @@ Route::middleware(['auth', 'admin', 'admin.logs'])
         Route::patch('/vendors/{vendor}/suspend', [VendorController::class, 'suspend'])
             ->name('vendors.suspend');
 
+        Route::delete('/vendors/{vendor}', [VendorController::class, 'destroy'])
+            ->name('vendors.destroy');
+
         /*
         | Gestion des clients
         */
