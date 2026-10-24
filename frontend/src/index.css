@@ -1,0 +1,18 @@
+@import 'tailwindcss';
+
+/* Couleurs de la marque GuinéeMall (reprises de l'ancien projet) */
+@theme {
+  --color-primary: #ffc107;
+  --color-primary-hover: #ffb300;
+  --color-primary-light: #ffe082;
+  --color-primary-dark: #ff8f00;
+  --color-secondary: #ffa726;
+  --color-secondary-dark: #ef6c00;
+  --color-surface: #ffffff;
+  --color-background: #f8f9fa;
+  --color-ink: #212529;
+}
+
+body {
+  @apply bg-background text-ink antialiased;
+}
