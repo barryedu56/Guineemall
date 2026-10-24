@@ -1,16 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Package } from 'lucide-react'
-import { useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Bike, CheckCircle2, Clock, MapPin, Package, Phone, Star, XCircle } from 'lucide-react'
+import { useEffect, useEffectEvent, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
-import { Button, Empty, ErrorBox, Spinner, StatusBadge } from '../components/ui'
-import { api, errorMessage, formatDate, formatGNF } from '../lib/api'
+import Price from '../components/Price'
+import { Button, Empty, ErrorBox, Input, Spinner, StatusBadge } from '../components/ui'
+import { useAuth } from '../context/auth'
+import { useRealtime } from '../context/realtime'
+import { api, errorMessage, formatDate } from '../lib/api'
+import { startPayment } from '../lib/payment'
 import type { Order, Paginated } from '../lib/types'
 
 const PAYMENT_LABELS = {
   cash_on_delivery: 'Paiement à la livraison',
   orange_money: 'Orange Money',
   mtn_momo: 'MTN Mobile Money',
+  card: 'Carte bancaire',
 }
 
 export function OrdersPage() {
@@ -23,9 +28,7 @@ export function OrdersPage() {
   if (!data?.results.length) {
     return (
       <Empty icon={<Package />} title="Aucune commande pour le moment">
-        <Link to="/produits" className="font-medium text-primary-dark hover:underline">
-          Commencer mes achats
-        </Link>
+        <Link to="/produits" className="font-medium text-primary-dark hover:underline">Commencer mes achats</Link>
       </Empty>
     )
   }
@@ -34,19 +37,16 @@ export function OrdersPage() {
     <div className="mx-auto max-w-3xl space-y-3">
       <h1 className="mb-4 text-2xl font-bold">Mes commandes</h1>
       {data.results.map((order) => (
-        <Link
-          key={order.id}
-          to={`/commandes/${order.id}`}
-          className="flex items-center justify-between gap-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5 hover:ring-primary"
-        >
+        <Link key={order.id} to={`/commandes/${order.id}`} className="flex items-center justify-between gap-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5 hover:ring-primary">
           <div>
             <p className="font-semibold">Commande #{order.id}</p>
             <p className="text-sm text-ink/60">
               {formatDate(order.created_at)} · {order.vendor_orders.reduce((n, vo) => n + vo.items.length, 0)} article(s)
             </p>
+            {order.awaiting_payment && <p className="text-sm font-medium text-amber-700">En attente de paiement</p>}
           </div>
           <div className="text-right">
-            <p className="font-bold">{formatGNF(order.total_amount)}</p>
+            <Price amount={order.total_amount} className="block font-bold" />
             <StatusBadge status={order.status} label={order.status_label} />
           </div>
         </Link>
@@ -55,30 +55,83 @@ export function OrdersPage() {
   )
 }
 
+/** Après un paiement : vérifie le statut toutes les 3 s tant qu'il est en attente. */
+function PaymentBanner({ reference, onDone }: { reference: string; onDone: () => void }) {
+  const { data } = useQuery({
+    queryKey: ['payment', reference],
+    queryFn: async () => (await api.get<{ status: string }>(`/payments/${reference}/`)).data,
+    refetchInterval: (q) => (q.state.data?.status === 'pending' ? 3000 : false),
+  })
+  const status = data?.status
+  const finished = useEffectEvent(onDone)
+  useEffect(() => {
+    if (status && status !== 'pending') finished()
+  }, [status])
+  if (!data) return null
+  if (data.status === 'pending') {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
+        <Clock className="size-7 shrink-0 animate-pulse" />
+        <p>Paiement en cours de vérification… Gardez cette page ouverte.</p>
+      </div>
+    )
+  }
+  return data.status === 'success' ? (
+    <div className="flex items-center gap-3 rounded-2xl bg-green-50 p-4 text-green-800">
+      <CheckCircle2 className="size-8 shrink-0" />
+      <div>
+        <p className="font-semibold">Paiement reçu, merci !</p>
+        <p className="text-sm">Votre argent est protégé jusqu'à ce que vous confirmiez la réception.</p>
+      </div>
+    </div>
+  ) : (
+    <div className="flex items-center gap-3 rounded-2xl bg-red-50 p-4 text-red-700">
+      <XCircle className="size-8 shrink-0" />
+      <p>Le paiement n'a pas abouti. Vous pouvez réessayer ci-dessous.</p>
+    </div>
+  )
+}
+
 export function OrderDetailPage() {
   const { id } = useParams()
+  const { user } = useAuth()
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(params.get('erreur'))
+  const [phone, setPhone] = useState(user?.phone ?? '')
+  const [riderPositions, setRiderPositions] = useState<Record<number, { latitude: string; longitude: string }>>({})
+  const key = ['orders', id]
 
   const { data: order, isLoading } = useQuery({
-    queryKey: ['orders', id],
+    queryKey: key,
     queryFn: async () => (await api.get<Order>(`/orders/${id}/`)).data,
   })
 
-  const cancel = useMutation({
-    mutationFn: async () => (await api.post<Order>(`/orders/${id}/cancel/`)).data,
-    onSuccess: (updated) => {
-      queryClient.setQueryData(['orders', id], updated)
-      queryClient.invalidateQueries({ queryKey: ['orders'], exact: true })
+  useRealtime((event) => {
+    if (event.type === 'rider_location' && String(event.order_id) === id) {
+      setRiderPositions((p) => ({ ...p, [event.order_id]: { latitude: event.latitude, longitude: event.longitude } }))
+    }
+    if (event.type === 'notification' && event.notification.link === `/commandes/${id}`) {
+      queryClient.invalidateQueries({ queryKey: key })
+    }
+  })
+
+  const action = useMutation({
+    mutationFn: async (kind: 'cancel' | 'confirm' | 'pay') => {
+      if (kind === 'pay') return startPayment(Number(id), phone, navigate)
+      const url = kind === 'cancel' ? `/orders/${id}/cancel/` : `/orders/${id}/confirm-reception/`
+      queryClient.setQueryData(key, (await api.post<Order>(url)).data)
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['orders'], exact: true }),
     onError: (e) => setError(errorMessage(e)),
   })
 
   if (isLoading) return <Spinner />
   if (!order) return <p className="py-16 text-center">Commande introuvable.</p>
 
-  const cancellable = order.vendor_orders.some((vo) => vo.status === 'pending' || vo.status === 'confirmed')
+  const cancellable = order.status !== 'cancelled' && order.vendor_orders.some((vo) => vo.status === 'pending' || vo.status === 'confirmed')
+  const reference = params.get('paiement')
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -91,6 +144,10 @@ export function OrderDetailPage() {
           </div>
         </div>
       )}
+      {params.get('message') && <p className="rounded-2xl bg-blue-50 p-4 text-blue-900">{params.get('message')}</p>}
+      {reference && reference !== 'annule' && (
+        <PaymentBanner reference={reference} onDone={() => queryClient.invalidateQueries({ queryKey: key })} />
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -100,39 +157,90 @@ export function OrderDetailPage() {
         <StatusBadge status={order.status} label={order.status_label} />
       </div>
 
-      {order.vendor_orders.map((vo) => (
-        <section key={vo.id} className="rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-semibold">{vo.shop_name}</h2>
-            <StatusBadge status={vo.status} label={vo.status_label} />
-          </div>
-          <ul className="divide-y divide-ink/5 text-sm">
-            {vo.items.map((item) => (
-              <li key={item.id} className="flex justify-between gap-2 py-2">
-                <span>
-                  {item.quantity} × {item.product_slug ? <Link to={`/produit/${item.product_slug}`} className="hover:underline">{item.product_name}</Link> : item.product_name}
-                </span>
-                <span className="shrink-0">{formatGNF(item.subtotal)}</span>
-              </li>
-            ))}
-          </ul>
+      {order.awaiting_payment && (
+        <section className="space-y-3 rounded-2xl bg-amber-50 p-4">
+          <p className="font-semibold text-amber-900">
+            Paiement {PAYMENT_LABELS[order.payment_method]} en attente – la commande sera annulée si elle n'est pas payée sous 30 minutes.
+          </p>
+          {order.payment_method === 'mtn_momo' && (
+            <Input label="Numéro MTN qui paie" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          )}
+          <Button loading={action.isPending && action.variables === 'pay'} onClick={() => action.mutate('pay')}>
+            Payer <Price amount={order.total_amount} />
+          </Button>
         </section>
-      ))}
+      )}
+
+      {order.can_confirm_reception && (
+        <section className="space-y-3 rounded-2xl bg-primary-light/50 p-4">
+          <p className="font-semibold">Avez-vous bien reçu votre colis ?</p>
+          <p className="text-sm text-ink/70">En confirmant, vous autorisez le paiement de la boutique.</p>
+          <Button loading={action.isPending && action.variables === 'confirm'} onClick={() => action.mutate('confirm')}>
+            Oui, j'ai bien reçu ma commande
+          </Button>
+        </section>
+      )}
+
+      {order.vendor_orders.map((vo) => {
+        const position = riderPositions[order.id] ?? (vo.tracking?.latitude ? { latitude: vo.tracking.latitude, longitude: vo.tracking.longitude! } : null)
+        return (
+          <section key={vo.id} className="rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+            <div className="mb-2 flex items-center justify-between">
+              <Link to={`/boutique/${vo.shop_slug}`} className="font-semibold hover:underline">{vo.shop_name}</Link>
+              <StatusBadge status={vo.status} label={vo.status_label} />
+            </div>
+            <ul className="divide-y divide-ink/5 text-sm">
+              {vo.items.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-2 py-2">
+                  <span>
+                    {item.quantity} × {item.product_slug ? <Link to={`/produit/${item.product_slug}`} className="hover:underline">{item.product_name}</Link> : item.product_name}
+                    {vo.status === 'delivered' && item.product_slug && (
+                      <Link to={`/produit/${item.product_slug}#avis`} className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-primary-dark hover:underline">
+                        <Star className="size-3" /> Donner mon avis
+                      </Link>
+                    )}
+                  </span>
+                  <Price amount={item.subtotal} className="shrink-0" />
+                </li>
+              ))}
+            </ul>
+            {vo.tracking && vo.tracking.status !== 'open' && (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-background p-3 text-sm">
+                <Bike className="size-5 text-primary-dark" />
+                <span className="font-medium">{vo.tracking.status_label}</span>
+                {vo.tracking.rider_name && <span>· {vo.tracking.rider_name}</span>}
+                {vo.tracking.rider_phone && (
+                  <a href={`tel:${vo.tracking.rider_phone}`} className="flex items-center gap-1 text-primary-dark"><Phone className="size-4" /> Appeler</a>
+                )}
+                {position && vo.tracking.status === 'picked_up' && (
+                  <a href={`https://www.google.com/maps?q=${position.latitude},${position.longitude}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-primary-dark underline">
+                    <MapPin className="size-4" /> Voir où est le livreur
+                  </a>
+                )}
+              </div>
+            )}
+          </section>
+        )
+      })}
 
       <section className="grid gap-4 rounded-2xl bg-surface p-4 ring-1 ring-ink/5 sm:grid-cols-2">
         <div>
-          <h2 className="mb-1 text-sm font-semibold text-ink/60">Livraison</h2>
-          <p>
-            {order.delivery_quartier}, {order.delivery_commune || order.delivery_city}
-          </p>
+          <h2 className="mb-1 text-sm font-semibold text-ink/60">{order.delivery_method === 'pickup' ? 'Retrait en point relais' : 'Livraison'}</h2>
+          {order.delivery_name && <p className="font-medium">Pour : {order.delivery_name}</p>}
+          <p>{order.pickup_point_name ?? `${order.delivery_quartier}, ${order.delivery_commune || order.delivery_city}`}</p>
           <p className="text-sm text-ink/70">{order.delivery_landmark}</p>
           <p className="text-sm text-ink/70">{order.delivery_phone}</p>
         </div>
-        <div>
-          <h2 className="mb-1 text-sm font-semibold text-ink/60">Paiement</h2>
-          <p>{PAYMENT_LABELS[order.payment_method]}</p>
-          <p className="mt-2 text-xl font-bold">{formatGNF(order.total_amount)}</p>
-        </div>
+        <dl className="space-y-1 text-sm">
+          <h2 className="mb-1 font-semibold text-ink/60">Paiement · {PAYMENT_LABELS[order.payment_method]}</h2>
+          <div className="flex justify-between"><dt>Articles</dt><dd><Price amount={order.subtotal} /></dd></div>
+          <div className="flex justify-between"><dt>Livraison</dt><dd><Price amount={order.delivery_fee} /></dd></div>
+          {order.discount_amount > 0 && (
+            <div className="flex justify-between text-green-700"><dt>Réduction {order.coupon_code}</dt><dd>-<Price amount={order.discount_amount} /></dd></div>
+          )}
+          <div className="flex justify-between pt-1 text-lg font-bold"><dt>Total</dt><dd><Price amount={order.total_amount} /></dd></div>
+          <p className="text-ink/60">{order.payment_status_label}</p>
+        </dl>
       </section>
 
       <ErrorBox message={error} />
@@ -140,8 +248,8 @@ export function OrderDetailPage() {
         <Button
           variant="outline"
           className="w-full text-red-600"
-          loading={cancel.isPending}
-          onClick={() => window.confirm('Annuler cette commande ?') && cancel.mutate()}
+          loading={action.isPending && action.variables === 'cancel'}
+          onClick={() => window.confirm('Annuler cette commande ?') && action.mutate('cancel')}
         >
           Annuler la commande
         </Button>

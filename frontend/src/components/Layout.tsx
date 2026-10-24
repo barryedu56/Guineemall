@@ -1,9 +1,14 @@
-import { Heart, Home, LayoutGrid, LogOut, Package, Search, ShoppingCart, Store, User } from 'lucide-react'
+import { Bike, Heart, Home, LayoutGrid, LogOut, MessageCircle, Package, Search, ShoppingCart, Store, User } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
+import { setCurrency, useCurrency } from '../context/settings'
+import type { Currency } from '../lib/prefs'
+import { useConversations } from '../pages/chat/useConversations'
+import NotificationBell from './NotificationBell'
+import VoiceButton from './VoiceButton'
 
 export default function Layout() {
   return (
@@ -29,9 +34,12 @@ export function Logo() {
 function SearchBar({ className = '' }: { className?: string }) {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
+  function search(text: string) {
+    navigate(`/produits?search=${encodeURIComponent(text.trim())}`)
+  }
   function submit(e: FormEvent) {
     e.preventDefault()
-    navigate(`/produits?search=${encodeURIComponent(q.trim())}`)
+    search(q)
   }
   return (
     <form onSubmit={submit} className={`relative ${className}`}>
@@ -40,7 +48,13 @@ function SearchBar({ className = '' }: { className?: string }) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Rechercher un produit, une boutique…"
-        className="w-full rounded-full border border-ink/10 bg-background py-2.5 pl-10 pr-4 outline-none focus:border-primary-dark focus:ring-2 focus:ring-primary/40"
+        className="w-full rounded-full border border-ink/10 bg-background py-2.5 pl-10 pr-11 outline-none focus:border-primary-dark focus:ring-2 focus:ring-primary/40"
+      />
+      <VoiceButton
+        onResult={(text) => {
+          setQ(text)
+          search(text)
+        }}
       />
     </form>
   )
@@ -54,6 +68,22 @@ function CartLink() {
       {count > 0 && (
         <span className="absolute -right-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-full bg-secondary-dark px-1 text-xs font-bold text-white">
           {count}
+        </span>
+      )}
+    </Link>
+  )
+}
+
+function MessagesLink() {
+  const { user } = useAuth()
+  const { data: conversations = [] } = useConversations()
+  const unread = conversations.reduce((n, c) => n + c.unread, 0)
+  return (
+    <Link to={user?.role === 'vendeur' ? '/vendeur/messages' : '/messages'} className="relative rounded-full p-2 hover:bg-ink/5" aria-label="Messages">
+      <MessageCircle className="size-6" />
+      {unread > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+          {unread}
         </span>
       )}
     </Link>
@@ -75,11 +105,18 @@ function Header() {
               <Store className="size-5" /> Ma boutique
             </Link>
           )}
+          {user?.role === 'livreur' && (
+            <Link to="/livreur" className="hidden items-center gap-1.5 rounded-full px-3 py-2 font-medium hover:bg-ink/5 md:flex">
+              <Bike className="size-5" /> Mes courses
+            </Link>
+          )}
           {user && (
             <Link to="/favoris" className="hidden rounded-full p-2 hover:bg-ink/5 md:block" aria-label="Favoris">
               <Heart className="size-6" />
             </Link>
           )}
+          {user && <MessagesLink />}
+          {user && <NotificationBell />}
           <CartLink />
           {user ? (
             <div className="hidden items-center gap-1 md:flex">
@@ -118,7 +155,9 @@ function MobileNav() {
     { to: '/produits', label: 'Produits', icon: LayoutGrid },
     user?.role === 'vendeur'
       ? { to: '/vendeur', label: 'Boutique', icon: Store }
-      : { to: '/commandes', label: 'Commandes', icon: Package },
+      : user?.role === 'livreur'
+        ? { to: '/livreur', label: 'Courses', icon: Bike }
+        : { to: '/commandes', label: 'Commandes', icon: Package },
     { to: user ? '/compte' : '/connexion', label: 'Compte', icon: User },
   ]
   return (
@@ -142,14 +181,36 @@ function MobileNav() {
 
 const YEAR = new Date().getFullYear()
 
+export function CurrencySwitcher() {
+  const currency = useCurrency()
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      Afficher aussi les prix en
+      <select
+        value={currency}
+        onChange={(e) => setCurrency(e.target.value as Currency)}
+        className="rounded-lg border border-ink/15 bg-surface px-2 py-1"
+      >
+        <option value="GNF">GNF uniquement</option>
+        <option value="EUR">Euros (€)</option>
+        <option value="USD">Dollars ($)</option>
+      </select>
+    </label>
+  )
+}
+
 function Footer() {
   return (
-    <footer className="mt-12 hidden border-t border-ink/5 bg-surface md:block">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-6 text-sm text-ink/60">
+    <footer className="mt-12 border-t border-ink/5 bg-surface">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-6 text-sm text-ink/60">
         <span>© {YEAR} GuinéeMall · Le marché guinéen, dans votre poche.</span>
-        <Link to="/devenir-vendeur" className="font-medium text-primary-dark hover:underline">
-          Vendre sur GuinéeMall
-        </Link>
+        <nav className="flex flex-wrap gap-4">
+          <Link to="/parrainage" className="hover:underline">Inviter des amis</Link>
+          <Link to="/lives" className="hover:underline">Ventes en direct</Link>
+          <Link to="/devenir-livreur" className="hover:underline">Devenir livreur</Link>
+          <Link to="/devenir-vendeur" className="font-medium text-primary-dark hover:underline">Vendre sur GuinéeMall</Link>
+        </nav>
+        <CurrencySwitcher />
       </div>
     </footer>
   )

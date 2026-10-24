@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MapPin, Phone, ShoppingBag } from 'lucide-react'
+import { Bike, Lock, MapPin, Phone, ShoppingBag, Store } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button, Empty, ErrorBox, Spinner, StatusBadge } from '../../components/ui'
@@ -20,12 +20,12 @@ const ACTIONS: Record<VendorOrderStatus, string> = {
   pending: '',
   confirmed: 'Confirmer',
   preparing: 'Commencer la préparation',
-  ready: 'Marquer prête',
+  ready: 'Marquer prête (un livreur GuinéeMall peut la prendre)',
   delivered: 'Marquer livrée',
   cancelled: 'Refuser / annuler',
 }
 
-const PAYMENT_LABELS = { cash_on_delivery: 'À la livraison', orange_money: 'Orange Money', mtn_momo: 'MTN MoMo' }
+const PAYMENT_LABELS = { cash_on_delivery: 'À la livraison', orange_money: 'Orange Money', mtn_momo: 'MTN MoMo', card: 'Carte' }
 
 export default function VendorOrdersPage() {
   const [filter, setFilter] = useState('')
@@ -91,16 +91,36 @@ function VendorOrderCard({ order }: { order: VendorSideOrder }) {
             <span>{formatGNF(item.subtotal)}</span>
           </li>
         ))}
+        {order.vendor_discount > 0 && (
+          <li className="flex justify-between text-green-700"><span>Votre code promo</span><span>-{formatGNF(order.vendor_discount)}</span></li>
+        )}
+        <li className="flex justify-between text-ink/60"><span>Livraison</span><span>{formatGNF(order.delivery_fee)}</span></li>
         <li className="mt-1 flex justify-between border-t border-ink/10 pt-1 font-semibold">
-          <span>Total · {PAYMENT_LABELS[order.payment_method]}</span>
+          <span>Payé par le client · {PAYMENT_LABELS[order.payment_method]}</span>
           <span>{formatGNF(order.total_amount)}</span>
         </li>
+        <li className="flex justify-between text-ink/60">
+          <span>Vous touchez pour les articles (après commission)</span>
+          <span className="font-semibold text-ink">{formatGNF(order.net_amount)}</span>
+        </li>
       </ul>
+      {order.payment_method !== 'cash_on_delivery' && !order.funds_released_at && order.status !== 'cancelled' && (
+        <p className="flex items-center gap-2 text-sm text-ink/60">
+          <Lock className="size-4" /> Payé en ligne : versé dans votre portefeuille après confirmation de réception par le client.
+        </p>
+      )}
+      {order.delivery_method === 'pickup' && (
+        <p className="flex items-center gap-2 text-sm font-medium text-primary-dark"><Store className="size-4" /> À déposer au point relais</p>
+      )}
+      {order.tracking && order.tracking.status !== 'open' && (
+        <p className="flex items-center gap-2 text-sm"><Bike className="size-4 text-primary-dark" /> {order.tracking.status_label} · {order.tracking.rider_name} {order.tracking.rider_phone}</p>
+      )}
 
       <div className="space-y-1 rounded-xl bg-background p-3 text-sm">
         <p className="flex items-start gap-2">
           <MapPin className="mt-0.5 size-4 shrink-0 text-primary-dark" />
           <span>
+            <span className="font-medium">{d.name} · </span>
             {d.quartier}, {d.commune || d.city} — {d.landmark}
             {mapLink && (
               <a href={mapLink} target="_blank" rel="noreferrer" className="ml-1 text-primary-dark underline">

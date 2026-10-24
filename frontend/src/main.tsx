@@ -5,7 +5,12 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { AuthProvider } from './context/AuthProvider'
 import { CartProvider } from './context/CartProvider'
+import { RealtimeProvider } from './context/RealtimeProvider'
 import './index.css'
+import { captureAffiliateCode } from './lib/prefs'
+
+// Lien d'ambassadeur ou de parrainage (?ref=CODE) mémorisé dès l'arrivée
+captureAffiliateCode()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,9 +23,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CartProvider>
-          <App />
-        </CartProvider>
+        <RealtimeProvider>
+          <CartProvider>
+            <App />
+          </CartProvider>
+        </RealtimeProvider>
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

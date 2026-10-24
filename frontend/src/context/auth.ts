@@ -7,6 +7,7 @@ export interface RegisterData {
   name: string
   phone: string
   password: string
+  referral?: string
 }
 
 export interface VendorRegisterData extends RegisterData {
@@ -15,12 +16,19 @@ export interface VendorRegisterData extends RegisterData {
   whatsapp: string
 }
 
+export interface RiderRegisterData extends RegisterData {
+  city: string
+  communes: string
+  vehicle_plate: string
+}
+
 export interface AuthContextValue {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<User>
   register: (data: RegisterData) => Promise<User>
   registerVendor: (data: VendorRegisterData) => Promise<User>
+  registerRider: (data: RiderRegisterData) => Promise<User>
   logout: () => void
 }
 

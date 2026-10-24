@@ -7,6 +7,8 @@ import StatutsBar from '../components/Statuts'
 import { Spinner } from '../components/ui'
 import { api } from '../lib/api'
 import type { Category, Paginated, ProductSummary } from '../lib/types'
+import { LiveStrip } from './LivePages'
+import { CampaignBanners } from './PromoPages'
 
 export default function HomePage() {
   const { data: categories = [] } = useQuery({
@@ -21,6 +23,8 @@ export default function HomePage() {
   return (
     <>
       <StatutsBar />
+      <CampaignBanners />
+      <LiveStrip />
 
       <section className="mb-8 overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-secondary px-6 py-10 sm:px-10">
         <h1 className="max-w-xl text-3xl font-extrabold leading-tight sm:text-4xl">
@@ -36,7 +40,7 @@ export default function HomePage() {
 
       <section className="mb-8 grid gap-3 sm:grid-cols-3">
         {[
-          { icon: ShieldCheck, title: 'Vendeurs vérifiés', text: 'Boutiques contrôlées par notre équipe' },
+          { icon: ShieldCheck, title: 'Paiement protégé', text: 'La boutique est payée après votre réception' },
           { icon: Smartphone, title: 'Mobile Money', text: 'Orange Money, MTN MoMo ou à la livraison' },
           { icon: Truck, title: 'Livraison à domicile', text: 'Indiquez simplement un repère près de chez vous' },
         ].map(({ icon: Icon, title, text }) => (

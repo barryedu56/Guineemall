@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, ErrorBox, Input, Textarea } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { errorMessage } from '../lib/api'
+import { affiliateCode } from '../lib/prefs'
 import type { User } from '../lib/types'
 
 function useRedirectAfterAuth() {
@@ -71,7 +72,8 @@ export function LoginPage() {
 export function RegisterPage() {
   const { register } = useAuth()
   const redirect = useRedirectAfterAuth()
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' })
+  // Code parrain pré-rempli si le visiteur est arrivé par un lien ?ref=CODE
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', referral: affiliateCode() })
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
@@ -96,6 +98,7 @@ export function RegisterPage() {
         <Input label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
         <Input label="Téléphone" type="tel" value={form.phone} onChange={set('phone')} placeholder="620 00 00 00" autoComplete="tel" />
         <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required minLength={8} autoComplete="new-password" hint="8 caractères minimum" />
+        <Input label="Code parrain (facultatif)" value={form.referral} onChange={set('referral')} hint="Un ami vous a invité ? Vous recevez un bon de réduction." />
         <ErrorBox message={error} />
         <Button type="submit" loading={loading} className="w-full">
           Créer mon compte

@@ -9,9 +9,11 @@ Elle remplace la version Laravel (`../Guineemall-main`, conservée comme référ
 |---|---|
 | Front | React 19 + TypeScript, Vite, Tailwind CSS 4, React Router, TanStack Query |
 | API | Django 5.2 LTS + Django REST Framework, authentification JWT |
-| Temps réel | Django Channels (chat, notifications) |
+| Temps réel | Django Channels (chat, notifications, suivi livreur, directs) |
+| Tâches de fond | Celery (commandes impayées, séquestre, WhatsApp) |
 | Base de données | PostgreSQL |
-| Cache / temps réel | Redis |
+| Cache / temps réel / file de tâches | Redis |
+| Paiements | Orange Money Web Pay, MTN MoMo Collection, Stripe Checkout (+ mode simulation) |
 
 ## Structure
 
@@ -24,8 +26,14 @@ backend/
     vendors/       boutiques, badge « vérifié »
     catalog/       catégories, produits, images, favoris
     orders/        panier, commandes, commandes par vendeur, historique
-    chat/          conversations client ↔ boutique
+    chat/          conversations client ↔ boutique (REST + WebSocket)
     statuts/       statuts éphémères de 24 h des boutiques
+    payments/      paiements en ligne (Orange Money, MTN, carte, simulation)
+    wallet/        portefeuilles, séquestre, retraits
+    delivery/      zones et tarifs, points relais, livreurs et courses
+    promotions/    codes promo, opérations commerciales
+    notifications/ notifications dans le site + WhatsApp
+    lives/         ventes en direct
 frontend/src/
   lib/             client API (JWT renouvelé automatiquement), types, formatage GNF
   context/         connexion et panier (le panier invité est fusionné à la connexion)
@@ -54,8 +62,15 @@ python3 -m venv .venv
 cp .env.example .env          # puis renseigner SECRET_KEY
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py createsuperuser
-.venv/bin/python manage.py runserver      # http://127.0.0.1:8000/admin
+.venv/bin/python manage.py runserver      # http://127.0.0.1:8000/admin (HTTP + WebSocket)
+
+# Dans deux autres terminaux : tâches de fond et tâches planifiées
+.venv/bin/celery -A config worker -l info
+.venv/bin/celery -A config beat -l info
 ```
+
+Sans worker Celery, le site fonctionne, mais les messages WhatsApp ne partent pas et les
+commandes impayées ne sont pas annulées automatiquement.
 
 ### Front
 ```bash
@@ -68,11 +83,13 @@ npm run dev                   # http://localhost:5173
 ```bash
 cd backend && .venv/bin/python manage.py seed_demo
 ```
-La commande crée 3 boutiques, 15 produits avec images et des statuts. Mot de passe de tous les comptes : `demo1234`.
+La commande crée 3 boutiques, 15 produits avec images, des statuts, les tarifs de livraison
+de Conakry et des grandes villes, 3 points relais, une opération Tabaski et un livreur. Mot de passe de tous les comptes : `demo1234`.
 
 | Compte | Email |
 |---|---|
-| Client | `client@demo.gn` |
+| Client | `client@demo.gn` (code promo `BIENVENUE`) |
+| Livreur | `livreur@demo.gn` |
 | Vendeur (Kipé Tech) | `kipe.tech@demo.gn` |
 | Vendeur (Madina Mode) | `madina.mode@demo.gn` |
 | Vendeur (Fouta Saveurs) | `fouta.saveurs@demo.gn` |
@@ -81,6 +98,62 @@ La commande crée 3 boutiques, 15 produits avec images et des statuts. Mot de pa
 ```bash
 cd backend && .venv/bin/python manage.py test apps
 ```
+
+## Paiements
+
+En développement (`PAYMENT_MODE=simulation`), Orange Money, MTN et la carte renvoient vers une page
+GuinéeMall où l'on choisit « réussi » ou « refusé ». Aucun argent réel n'est débité.
+
+Pour la production, il faut renseigner les clés dans `.env` et passer `PAYMENT_MODE=live`.
+- **Orange Money** : compte marchand Orange Guinée + application sur developer.orange.com (API « Orange Money Web Pay »)
+- **MTN MoMo** : compte marchand MTN Guinée + abonnement « Collection » sur momodeveloper.mtn.com
+- **Carte (diaspora)** : compte Stripe ; le montant est converti en euros avec `RATE_EUR_GNF`
+
+Les appels de retour des opérateurs ne sont jamais crus sur parole : ils déclenchent une vérification
+du statut directement auprès de l'opérateur.
+
+### Comment circule l'argent
+- **Paiement en ligne** : l'argent reste en séquestre. Il est versé dans le portefeuille de la boutique
+  (moins 8 % de commission) quand le client confirme la réception, ou automatiquement 3 jours après la livraison.
+- **Paiement à la livraison** : celui qui livre encaisse. Si c'est la boutique, la commission est débitée de
+  son portefeuille ; si c'est un livreur GuinéeMall, son portefeuille est débité des espèces encaissées et
+  crédité de sa course.
+- Les retraits vers Orange Money ou MTN sont demandés dans le portefeuille et validés par un admin
+  (Admin › Demandes de retrait › « Marquer comme payé »).
+
+## Notifications WhatsApp
+
+Renseigner `WHATSAPP_TOKEN` et `WHATSAPP_PHONE_NUMBER_ID` (API WhatsApp Cloud de Meta), puis créer dans le
+WhatsApp Manager un modèle nommé `guineemall_notification`, en français, avec le corps :
+```
+*{{1}}*
+{{2}}
+```
+Sans jeton, les messages sont seulement écrits dans les logs du worker Celery.
+
+## Administration (http://127.0.0.1:8000/admin)
+
+- **Boutiques** : action « Approuver » (le vendeur est notifié)
+- **Demandes de vérification** : voir les documents, action « Accepter (donner le badge) »
+- **Livreurs** : action « Valider »
+- **Zones de livraison** : tarifs modifiables directement dans la liste
+- **Codes promo** et **Opérations commerciales** (Tabaski, Ramadan…)
+- **Demandes de retrait**, **Paiements** (lecture seule), **Mouvements** de portefeuille
+
+## Production
+
+- Lancer l'application avec `daphne config.asgi:application` (HTTP + WebSocket), derrière Nginx en HTTPS
+- `DEBUG=False`, vrai `SECRET_KEY`, `ALLOWED_HOSTS`, `FRONTEND_URL` / `BACKEND_URL` publics
+- `python manage.py collectstatic`, front construit avec `npm run build` et servi par Nginx
+- Nginx : `/api`, `/admin`, `/media`, `/static` → Django ; `/ws` → Django en WebSocket ; le reste → `frontend/dist`
+- Celery worker + beat en service (systemd ou supervisor)
+- Sauvegarde quotidienne de PostgreSQL et du dossier `media/`
+
+## Langues locales
+
+L'interface est en français. La recherche vocale et les messages vocaux sont en place pour ceux qui
+préfèrent parler. Les traductions en Pular, Malinké et Soussou doivent être faites par des locuteurs natifs :
+une traduction automatique serait de mauvaise qualité dans ces langues. Il suffira de fournir les textes.
 
 ## API
 
@@ -91,8 +164,14 @@ Toutes les routes sont préfixées par `/api/`. L'authentification se fait par J
 | Comptes | `auth/register/` · `auth/register/vendor/` · `auth/token/` · `auth/token/refresh/` · `auth/me/` · `auth/addresses/` |
 | Catalogue (public) | `categories/` · `products/` (filtres `category`, `vendor`, `min_price`, `max_price`, `in_stock`, `search`, `ordering`) · `shops/` |
 | Client | `favorites/` · `favorites/<slug>/` · `cart/` · `cart/clear/` · `orders/` (POST = passer commande) · `orders/<id>/cancel/` |
+| Commande | `orders/quote/` (devis) · `orders/` · `orders/<id>/pay/` · `orders/<id>/confirm-reception/` · `orders/<id>/cancel/` · `payments/<ref>/` |
 | Statuts | `statuts/` (fil groupé par boutique) · `statuts/<id>/view/` |
-| Vendeur | `vendor/shop/` · `vendor/products/` (+ `images/`) · `vendor/orders/` (+ `status/`) · `vendor/statuts/` (+ `viewers/`) |
+| Social | `conversations/` (+ `start/`, `messages/`, `read/`, `typing/`) · `notifications/` · `auth/referral/` · `products/<slug>/reviews/` · `products/<slug>/share-image/` |
+| Promos et directs | `campaigns/` · `lives/` · `delivery/zones/` · `delivery/pickup-points/` · `config/` |
+| Portefeuille | `wallet/` · `wallet/payouts/` |
+| Vendeur | `vendor/shop/` · `vendor/products/` · `vendor/orders/` · `vendor/statuts/` · `vendor/coupons/` · `vendor/reviews/` · `vendor/lives/` · `vendor/stats/` · `vendor/verification/` |
+| Livreur | `auth/register/rider/` · `rider/profile/` · `rider/deliveries/` (+ `available/`, `accept/`, `pickup/`, `deliver/`, `location/`) |
+| Temps réel | `ws/?token=<jwt>` (messages, notifications, position du livreur) · `ws/live/<id>/` (commentaires d'un direct) |
 
 L'espace vendeur n'est accessible qu'une fois la boutique approuvée par un admin.
 

@@ -1,4 +1,4 @@
-import { Clock, CircleDot, LayoutDashboard, Package, ShoppingBag, Store } from 'lucide-react'
+import { CircleDot, Clock, LayoutDashboard, MessageCircle, MessageSquareQuote, Package, Radio, ShoppingBag, Store, Tag, Wallet } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { Spinner } from '../../components/ui'
@@ -9,7 +9,12 @@ const TABS = [
   { to: '/vendeur', label: 'Accueil', icon: LayoutDashboard, end: true },
   { to: '/vendeur/commandes', label: 'Commandes', icon: ShoppingBag },
   { to: '/vendeur/produits', label: 'Produits', icon: Package },
+  { to: '/vendeur/messages', label: 'Messages', icon: MessageCircle },
   { to: '/vendeur/statuts', label: 'Statuts', icon: CircleDot },
+  { to: '/vendeur/promos', label: 'Promos', icon: Tag },
+  { to: '/vendeur/lives', label: 'Directs', icon: Radio },
+  { to: '/vendeur/avis', label: 'Avis', icon: MessageSquareQuote },
+  { to: '/vendeur/portefeuille', label: 'Portefeuille', icon: Wallet },
   { to: '/vendeur/boutique', label: 'Boutique', icon: Store },
 ]
 

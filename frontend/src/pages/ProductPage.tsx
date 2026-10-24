@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Heart, ImageOff, MessageCircle, Minus, Plus, ShoppingCart } from 'lucide-react'
+import { BadgeCheck, Heart, ImageOff, MessageCircle, MessagesSquare, Minus, Plus, ShoppingCart } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import Price from '../components/Price'
+import ShareButton from '../components/ShareButton'
+import Stars from '../components/Stars'
 import { Button, ErrorBox, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
-import { api, errorMessage, formatGNF } from '../lib/api'
-import type { Paginated, ProductDetail, ProductSummary } from '../lib/types'
+import { api, errorMessage } from '../lib/api'
+import type { Conversation, Paginated, ProductDetail, ProductSummary } from '../lib/types'
+import Reviews from './Reviews'
 
 export default function ProductPage() {
   const { slug } = useParams()
@@ -30,6 +34,16 @@ export default function ProductPage() {
     enabled: !!user,
   })
   const isFavorite = favorites?.results.some((p) => p.slug === slug) ?? false
+
+  const contact = useMutation({
+    mutationFn: async () =>
+      (await api.post<Conversation>('/conversations/start/', { shop: product!.vendor.slug, product: slug })).data,
+    onSuccess: (c) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      navigate(`/messages/${c.id}`)
+    },
+    onError: (e) => setError(errorMessage(e)),
+  })
 
   const toggleFavorite = useMutation({
     mutationFn: () => (isFavorite ? api.delete(`/favorites/${slug}/`) : api.post(`/favorites/${slug}/`)),
@@ -67,6 +81,7 @@ export default function ProductPage() {
     : null
 
   return (
+    <>
     <div className="grid gap-8 md:grid-cols-2">
       <div>
         <div className="relative aspect-square overflow-hidden rounded-3xl bg-surface ring-1 ring-ink/5">
@@ -97,12 +112,17 @@ export default function ProductPage() {
             {product.category.name}
           </Link>
           <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{product.name}</h1>
+          {product.rating && (
+            <a href="#avis" className="mt-1 inline-block">
+              <Stars rating={product.rating} count={product.reviews_count} size="md" />
+            </a>
+          )}
         </div>
 
-        <div className="flex items-baseline gap-3">
-          <span className="text-3xl font-extrabold text-primary-dark">{formatGNF(product.price)}</span>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <Price amount={product.price} className="text-3xl font-extrabold text-primary-dark" />
           {product.compare_at_price && (
-            <span className="text-lg text-ink/50 line-through">{formatGNF(product.compare_at_price)}</span>
+            <Price amount={product.compare_at_price} className="text-lg text-ink/50 line-through" />
           )}
         </div>
 
@@ -141,6 +161,18 @@ export default function ProductPage() {
           )}
         </div>
 
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            className="flex-1"
+            loading={contact.isPending}
+            onClick={() => (user ? contact.mutate() : navigate(`/connexion?suivant=/produit/${slug}`))}
+          >
+            <MessagesSquare className="size-5" /> Écrire à la boutique
+          </Button>
+          <ShareButton slug={product.slug} name={product.name} />
+        </div>
+
         {whatsappLink && (
           <a
             href={whatsappLink}
@@ -162,6 +194,7 @@ export default function ProductPage() {
               {product.vendor.shop_name}
               {product.vendor.is_verified && <BadgeCheck className="size-4 text-primary-dark" />}
             </p>
+            {product.vendor.rating && <Stars rating={product.vendor.rating} count={product.vendor.reviews_count} />}
           </div>
           <span className="text-sm text-primary-dark">Voir la boutique →</span>
         </Link>
@@ -183,5 +216,7 @@ export default function ProductPage() {
         )}
       </div>
     </div>
+    <Reviews slug={product.slug} />
+    </>
   )
 }

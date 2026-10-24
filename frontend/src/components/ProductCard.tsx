@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useCart } from '../context/cart'
-import { formatGNF } from '../lib/api'
 import type { ProductSummary } from '../lib/types'
+import Price from './Price'
+import Stars from './Stars'
 
 export default function ProductCard({ product }: { product: ProductSummary }) {
   const { add } = useCart()
@@ -37,10 +38,11 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
         <Link to={`/produit/${product.slug}`} className="line-clamp-2 text-sm font-medium leading-snug hover:underline">
           {product.name}
         </Link>
+        <Stars rating={product.rating} count={product.reviews_count} />
         <div className="mt-auto pt-1">
-          <p className="font-bold text-primary-dark">{formatGNF(product.price)}</p>
+          <Price amount={product.price} className="block font-bold text-primary-dark" />
           {product.compare_at_price && (
-            <p className="text-xs text-ink/50 line-through">{formatGNF(product.compare_at_price)}</p>
+            <Price amount={product.compare_at_price} className="block text-xs text-ink/50 line-through" />
           )}
         </div>
         <button

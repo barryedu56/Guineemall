@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Heart, LogOut, MapPin, Package, Store, Trash2 } from 'lucide-react'
+import { Gift, Heart, LogOut, MapPin, MessageCircle, Package, Store, Trash2, Wallet } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import AddressForm from '../components/AddressForm'
+import { CurrencySwitcher } from '../components/Layout'
 import { ProductGrid } from '../components/ProductCard'
 import { Button, Empty, ErrorBox, Input, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
@@ -52,6 +53,9 @@ export function AccountPage() {
       <nav className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <QuickLink to="/commandes" icon={<Package />} label="Mes commandes" />
         <QuickLink to="/favoris" icon={<Heart />} label="Mes favoris" />
+        <QuickLink to="/messages" icon={<MessageCircle />} label="Messages" />
+        <QuickLink to="/parrainage" icon={<Gift />} label="Inviter des amis" />
+        <QuickLink to="/portefeuille" icon={<Wallet />} label="Portefeuille" />
         {user?.role === 'vendeur' && <QuickLink to="/vendeur" icon={<Store />} label="Ma boutique" />}
       </nav>
 
@@ -96,6 +100,11 @@ export function AccountPage() {
             + Ajouter une adresse
           </Button>
         )}
+      </section>
+
+      <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+        <h2 className="mb-2 font-semibold">Vous êtes à l'étranger ?</h2>
+        <CurrencySwitcher />
       </section>
 
       <Button

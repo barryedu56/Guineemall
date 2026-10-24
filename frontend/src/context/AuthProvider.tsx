@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 
 import { api, tokens } from '../lib/api'
 import type { User } from '../lib/types'
-import { AuthContext, type RegisterData, type VendorRegisterData } from './auth'
+import { AuthContext, type RegisterData, type RiderRegisterData, type VendorRegisterData } from './auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -51,6 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       registerVendor: async (payload: VendorRegisterData) => {
         const { data } = await api.post('/auth/register/vendor/', payload)
+        tokens.set(data.tokens.access, data.tokens.refresh)
+        return fetchMe()
+      },
+      registerRider: async (payload: RiderRegisterData) => {
+        const { data } = await api.post('/auth/register/rider/', payload)
         tokens.set(data.tokens.access, data.tokens.refresh)
         return fetchMe()
       },
