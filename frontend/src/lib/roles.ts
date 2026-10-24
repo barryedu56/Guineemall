@@ -3,7 +3,7 @@ import type { Role } from './types'
 /** Page d'arrivée de chaque rôle après connexion. */
 export const ROLE_HOME: Record<Role, string> = {
   client: '/',
-  admin: '/',
+  admin: '/administration',
   vendeur: '/vendeur',
   livreur: '/livreur',
 }

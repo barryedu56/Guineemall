@@ -147,18 +147,14 @@ function RoleLink() {
   const links = {
     vendeur: { to: '/vendeur', label: 'Ma boutique', icon: Store },
     livreur: { to: '/livreur', label: 'Mes courses', icon: Bike },
-    admin: { to: '/admin/', label: 'Administration', icon: Settings, external: true },
+    admin: { to: '/administration', label: 'Administration', icon: Settings },
     client: null,
   } as const
   const link = links[user.role]
   if (!link) return null
   const Icon = link.icon
   const className = 'hidden items-center gap-2 rounded-full bg-primary-light px-4 py-2 text-sm font-semibold text-ink transition hover:bg-primary lg:flex'
-  return 'external' in link ? (
-    <a href={link.to} className={className}><Icon className="size-4" /> {link.label}</a>
-  ) : (
-    <Link to={link.to} className={className}><Icon className="size-4" /> {link.label}</Link>
-  )
+  return <Link to={link.to} className={className}><Icon className="size-4" /> {link.label}</Link>
 }
 
 function Header() {
@@ -259,7 +255,9 @@ function MobileNav() {
       ? { to: '/vendeur', label: 'Boutique', icon: Store, badge: 0 }
       : user?.role === 'livreur'
         ? { to: '/livreur', label: 'Courses', icon: Bike, badge: 0 }
-        : { to: '/commandes', label: 'Commandes', icon: Package, badge: 0 },
+        : user?.role === 'admin'
+          ? { to: '/administration', label: 'Admin', icon: Settings, badge: 0 }
+          : { to: '/commandes', label: 'Commandes', icon: Package, badge: 0 },
     { to: user ? '/compte' : '/connexion', label: 'Compte', icon: User, badge: 0 },
   ]
   return (

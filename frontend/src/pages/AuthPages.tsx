@@ -7,6 +7,7 @@ import { Logo } from '../components/Layout'
 import { Button, ErrorBox, Input, Textarea } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
+import { useToast } from '../context/toast'
 import { api, errorMessage } from '../lib/api'
 import { affiliateCode } from '../lib/prefs'
 
@@ -74,8 +75,10 @@ export function LoginPage() {
   const [params] = useSearchParams()
   const [form, set] = useFormState({ email: '', password: '' })
   // La redirection est faite par <GuestOnly> dès que l'utilisateur est connecté
+  const toast = useToast()
   const { submit, error, loading } = useSubmit(async () => {
-    await login(form.email, form.password)
+    const user = await login(form.email, form.password)
+    toast(`Bienvenue ${user.name.split(' ')[0]} 👋`)
   })
 
   return (
@@ -102,8 +105,10 @@ export function RegisterPage() {
   const { data: config } = useSiteConfig()
   // Code parrain pré-rempli si le visiteur est arrivé par un lien ?ref=CODE
   const [form, set] = useFormState({ name: '', email: '', phone: '', password: '', referral: affiliateCode() })
+  const toast = useToast()
   const { submit, error, loading } = useSubmit(async () => {
-    await register(form)
+    const user = await register(form)
+    toast(`Bienvenue ${user.name.split(' ')[0]}, votre compte est créé 🎉`)
   })
 
   return (
@@ -138,8 +143,10 @@ export function VendorRegisterPage() {
   const { registerVendor } = useAuth()
   const { data: config } = useSiteConfig()
   const [form, set] = useFormState({ name: '', email: '', phone: '', password: '', shop_name: '', shop_description: '', whatsapp: '' })
+  const toast = useToast()
   const { submit, error, loading } = useSubmit(async () => {
     await registerVendor(form)
+    toast('Votre boutique est créée 🎉')
   })
 
   return (

@@ -40,3 +40,22 @@ class WebSocketTests(TransactionTestCase):
         pong, event = async_to_sync(scenario)()
         self.assertEqual(pong, {"type": "pong"})
         self.assertEqual(event, {"type": "chat.message", "conversation": 1})
+
+
+class AdminDashboardTests(TransactionTestCase):
+    def test_reserve_aux_admins_et_ouvre_la_session_django(self):
+        from rest_framework.test import APIClient
+
+        api = APIClient()
+        client = User.objects.create_user(email="c@test.gn", password="x", name="C")
+        api.force_authenticate(client)
+        self.assertEqual(api.get("/api/admin/dashboard/").status_code, 403)
+
+        admin = User.objects.create_superuser(email="a@test.gn", password="x", name="A")
+        api.force_authenticate(admin)
+        data = api.get("/api/admin/dashboard/").data
+        self.assertEqual(data["totals"]["users"], 2)
+        self.assertIn("vendors_pending", data["todo"])
+
+        self.assertEqual(api.post("/api/admin/session/").status_code, 204)
+        self.assertEqual(api.get("/admin/").status_code, 200)  # admin Django accessible sans 2e connexion

@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import RequireAuth, { GuestOnly } from './components/RequireAuth'
 import { AccountPage, FavoritesPage } from './pages/AccountPages'
+import AdminDashboard from './pages/AdminDashboard'
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VendorRegisterPage } from './pages/AuthPages'
 import CartPage from './pages/CartPage'
 import ChatPage from './pages/chat/ChatPage'
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/parrainage" element={<RequireAuth><ReferralPage /></RequireAuth>} />
           <Route path="/portefeuille" element={<RequireAuth><WalletPage /></RequireAuth>} />
           <Route path="/livreur" element={<RequireAuth role="livreur"><RiderDashboard /></RequireAuth>} />
+          <Route path="/administration" element={<RequireAuth role="admin"><AdminDashboard /></RequireAuth>} />
 
           <Route path="/vendeur" element={<RequireAuth role="vendeur"><VendorLayout /></RequireAuth>}>
             <Route index element={<VendorDashboard />} />
