@@ -1,3 +1,122 @@
-from django.shortcuts import render
+from django.db.models import Prefetch
+from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
-# Create your views here.
+from apps.core.permissions import IsVendeur, get_vendor
+
+from . import services
+from .models import CartItem, Order, OrderItem, VendorOrder
+from .serializers import (
+    CartItemSerializer,
+    CheckoutSerializer,
+    OrderSerializer,
+    VendorOrderStatusSerializer,
+    VendorSideOrderSerializer,
+)
+
+
+class CartViewSet(viewsets.ModelViewSet):
+    """
+    GET /cart/ : contenu du panier + total
+    POST /cart/ {product_slug, quantity} : ajoute (ou augmente la quantité)
+    PATCH /cart/<id>/ {quantity} · DELETE /cart/<id>/ · DELETE /cart/clear/
+    """
+
+    serializer_class = CartItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+    http_method_names = ["get", "post", "patch", "delete"]
+
+    def get_queryset(self):
+        return (
+            CartItem.objects.filter(user=self.request.user)
+            .select_related("product__vendor", "product__category")
+            .prefetch_related("product__images")
+        )
+
+    def list(self, request, *args, **kwargs):
+        items = self.get_serializer(self.get_queryset(), many=True).data
+        return Response({"items": items, "total": sum(i["subtotal"] for i in items)})
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = serializer.validated_data["product"]
+        quantity = serializer.validated_data["quantity"]
+        item, created = CartItem.objects.get_or_create(
+            user=request.user, product=product, defaults={"quantity": quantity}
+        )
+        if not created:
+            if item.quantity + quantity > product.stock:
+                raise ValidationError({"quantity": f"Il ne reste que {product.stock} en stock."})
+            item.quantity += quantity
+            item.save(update_fields=["quantity", "updated_at"])
+        return Response(self.get_serializer(item).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["delete"])
+    def clear(self, request):
+        self.get_queryset().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def with_details(queryset):
+    return queryset.prefetch_related(
+        Prefetch("vendor_orders", queryset=VendorOrder.objects.select_related("vendor")),
+        Prefetch("vendor_orders__items", queryset=OrderItem.objects.select_related("product")),
+        "status_history",
+    )
+
+
+class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Commandes du client. POST /orders/ = passer commande avec le panier."""
+
+    serializer_class = OrderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ["status"]
+
+    def get_queryset(self):
+        return with_details(Order.objects.alive().filter(user=self.request.user))
+
+    def create(self, request):
+        checkout = CheckoutSerializer(data=request.data, context={"request": request})
+        checkout.is_valid(raise_exception=True)
+        try:
+            order = services.checkout(request.user, **checkout.validated_data)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=order.pk)).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        try:
+            services.cancel_order(self.get_object(), request.user)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
+
+
+class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Espace vendeur : les parties de commandes qui concernent sa boutique."""
+
+    serializer_class = VendorSideOrderSerializer
+    permission_classes = [IsVendeur]
+    filterset_fields = ["status"]
+
+    def get_queryset(self):
+        return (
+            get_vendor(self.request).vendor_orders
+            .select_related("order__user")
+            .prefetch_related(Prefetch("items", queryset=OrderItem.objects.select_related("product")))
+        )
+
+    @action(detail=True, methods=["post"])
+    def status(self, request, pk=None):
+        payload = VendorOrderStatusSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            services.update_vendor_order_status(self.get_object(), payload.validated_data["status"], request.user)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)

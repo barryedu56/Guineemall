@@ -4,8 +4,8 @@ Validée le 24/10/2026.
 
 ## V2.0 : migration + confiance
 - [x] Modèles migrés depuis Laravel (utilisateurs, boutiques, catalogue, commandes, panier, chat)
-- [x] **Statuts** de boutique sur 24 h, liés à un produit, avec la liste de qui les a vus (modèles)
-- [ ] API REST (authentification, catalogue, panier, commandes, statuts)
+- [x] **Statuts** de boutique sur 24 h, liés à un produit, avec la liste de qui les a vus (modèles + API)
+- [x] API REST (authentification, catalogue, panier, commandes, statuts), 31 tests
 - [ ] Chat en temps réel (Channels)
 - [ ] Paiement Orange Money / MTN MoMo + paiement à la livraison
 - [ ] Paiement sécurisé (séquestre) : le vendeur est payé après confirmation de la réception
