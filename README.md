@@ -26,7 +26,12 @@ backend/
     orders/        panier, commandes, commandes par vendeur, historique
     chat/          conversations client ↔ boutique
     statuts/       statuts éphémères de 24 h des boutiques
-frontend/          application React
+frontend/src/
+  lib/             client API (JWT renouvelé automatiquement), types, formatage GNF
+  context/         connexion et panier (le panier invité est fusionné à la connexion)
+  components/      en-tête, navigation mobile, carte produit, barre et lecteur de statuts
+  pages/           pages client
+  pages/vendor/    espace vendeur : tableau de bord, commandes, produits, statuts, boutique
 ```
 
 ## Installation
@@ -58,6 +63,19 @@ cd frontend
 npm install
 npm run dev                   # http://localhost:5173
 ```
+
+### Données de démonstration
+```bash
+cd backend && .venv/bin/python manage.py seed_demo
+```
+La commande crée 3 boutiques, 15 produits avec images et des statuts. Mot de passe de tous les comptes : `demo1234`.
+
+| Compte | Email |
+|---|---|
+| Client | `client@demo.gn` |
+| Vendeur (Kipé Tech) | `kipe.tech@demo.gn` |
+| Vendeur (Madina Mode) | `madina.mode@demo.gn` |
+| Vendeur (Fouta Saveurs) | `fouta.saveurs@demo.gn` |
 
 ### Tests
 ```bash

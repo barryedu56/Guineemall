@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django_filters",
     "channels",
     # GuinéeMall
+    "apps.core",
     "apps.accounts",
     "apps.vendors",
     "apps.catalog",

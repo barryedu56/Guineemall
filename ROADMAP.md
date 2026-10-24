@@ -15,7 +15,7 @@ Validée le 24/10/2026.
 - [ ] Tarifs de livraison par commune et ville
 - [ ] Notifications WhatsApp (commande, message, suivi)
 - [ ] PWA : installable, légère, fonctionne avec une connexion faible
-- [ ] Interfaces React : client, vendeur, admin
+- [x] Interfaces React : client et vendeur (l'admin passe par /admin de Django)
 
 ## V2.1 : croissance par les réseaux sociaux
 - [ ] Image de partage automatique (Statut WhatsApp, Facebook, TikTok)
