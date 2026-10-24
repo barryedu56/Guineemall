@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, F, Q
 from django.http import HttpResponse
 from rest_framework import generics, mixins, parsers, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -64,6 +64,28 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         return ProductDetailSerializer if self.action == "retrieve" else ProductListSerializer
+
+    @action(detail=False, url_path="for-you", permission_classes=[permissions.IsAuthenticated])
+    def for_you(self, request):
+        """
+        Sélection personnalisée : produits des catégories que le client achète ou met en favori,
+        qu'il n'a pas encore achetés. À défaut, les produits les mieux notés puis les plus récents.
+        """
+        user = request.user
+        bought = OrderItem.objects.filter(order__user=user, product__isnull=False).values_list("product_id", flat=True)
+        categories = set(Product.objects.filter(pk__in=bought).values_list("category_id", flat=True))
+        categories |= set(Product.objects.filter(favorited_by__user=user).values_list("category_id", flat=True))
+
+        products = public_products().exclude(pk__in=bought).filter(stock__gt=0)
+        if categories:
+            products = products.filter(category_id__in=categories)
+        products = list(products.order_by(F("rating").desc(nulls_last=True), "-created_at")[:10])
+        if len(products) < 10:
+            seen = [p.pk for p in products]
+            products += list(
+                public_products().exclude(pk__in=[*seen, *bought]).filter(stock__gt=0).order_by("-created_at")[: 10 - len(products)]
+            )
+        return Response(ProductListSerializer(products, many=True, context={"request": request}).data)
 
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)

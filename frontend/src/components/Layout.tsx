@@ -296,9 +296,10 @@ export function CurrencySwitcher() {
         onChange={(e) => setCurrency(e.target.value as Currency)}
         className="rounded-full border border-current/20 bg-transparent px-3 py-1.5"
       >
-        <option value="GNF">GNF uniquement</option>
-        <option value="EUR">Euros (€)</option>
-        <option value="USD">Dollars ($)</option>
+        {/* Couleurs explicites : la liste déroulante du système est toujours claire, même sur fond sombre */}
+        <option value="GNF" className="bg-surface text-ink">GNF uniquement</option>
+        <option value="EUR" className="bg-surface text-ink">Euros (€)</option>
+        <option value="USD" className="bg-surface text-ink">Dollars ($)</option>
       </select>
     </label>
   )

@@ -96,3 +96,25 @@ class ReviewTests(GuineeMallTestCase):
     def test_image_de_partage(self):
         r = self.client.get(f"/api/products/{self.product.slug}/share-image/")
         self.assertEqual((r.status_code, r["Content-Type"]), (200, "image/jpeg"))
+
+
+class ForYouTests(GuineeMallTestCase):
+    def test_selection_selon_les_achats(self):
+        from apps.catalog.models import Category
+        from apps.orders.models import Order, OrderItem, VendorOrder
+
+        vendor = self.make_vendor()
+        mode, _ = Category.objects.get_or_create(name="Mode")
+        achete = self.make_product(vendor, name="Pagne acheté", category=mode)
+        similaire = self.make_product(vendor, name="Bazin", category=mode)
+        self.make_product(vendor, name="Téléphone")  # autre catégorie
+        user = self.make_client()
+        order = Order.objects.create(user=user, total_amount=1, delivery_city="Conakry", delivery_landmark="x", delivery_phone="6")
+        vo = VendorOrder.objects.create(order=order, vendor=vendor, total_amount=1)
+        OrderItem.objects.create(order=order, vendor_order=vo, product=achete, product_name="x", unit_price=1, quantity=1)
+
+        self.client.force_authenticate(user)
+        names = [p["name"] for p in self.client.get("/api/products/for-you/").data]
+        self.assertEqual(names[0], similaire.name)       # d'abord la catégorie achetée
+        self.assertNotIn(achete.name, names)              # jamais un produit déjà acheté
+        self.assertIn("Téléphone", names)                 # complété par les nouveautés

@@ -6,10 +6,12 @@ import { ProductGrid, ProductGridSkeleton } from '../components/ProductCard'
 import Stars from '../components/Stars'
 import StatutsBar, { ShopAvatar } from '../components/Statuts'
 import { SectionHeader, Skeleton } from '../components/ui'
+import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
 import { api } from '../lib/api'
 import { useCategories } from '../lib/queries'
 import type { Paginated, ProductSummary, Shop } from '../lib/types'
+import ClientHome from './ClientHome'
 import { LiveStrip } from './LivePages'
 import { CampaignBanners } from './PromoPages'
 
@@ -21,6 +23,13 @@ function useProducts(key: string, params: Record<string, string | number>) {
 }
 
 export default function HomePage() {
+  const { user } = useAuth()
+  // Le client connecté a son propre accueil ; les visiteurs voient la vitrine
+  if (user?.role === 'client') return <ClientHome />
+  return <PublicHome />
+}
+
+function PublicHome() {
   const latest = useProducts('latest', { ordering: '-created_at', page_size: 10 })
   const onSale = useProducts('on-sale', { on_sale: 'true', page_size: 5 })
 

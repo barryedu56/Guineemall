@@ -34,8 +34,8 @@ class GuineeMallTestCase(APITestCase):
         user = User.objects.create_user(email=email, password="x", name=shop_name, role=User.Role.VENDEUR)
         return Vendor.objects.create(user=user, shop_name=shop_name, status=status)
 
-    def make_product(self, vendor, name="Téléphone", price=1_500_000, stock=10, **kwargs):
-        category, _ = Category.objects.get_or_create(name="Électronique")
+    def make_product(self, vendor, name="Téléphone", price=1_500_000, stock=10, category=None, **kwargs):
+        category = category or Category.objects.get_or_create(name="Électronique")[0]
         return Product.objects.create(
             vendor=vendor, category=category, name=name, description="…", price=price, stock=stock, **kwargs
         )
