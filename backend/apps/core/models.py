@@ -52,3 +52,69 @@ def unique_slug(instance, value, field="slug", fallback="item"):
         n += 1
         slug = f"{base}-{n}"
     return slug
+
+
+class SiteSettings(models.Model):
+    """
+    Réglages du site modifiables dans l'admin (une seule ligne) : textes de l'accueil,
+    coordonnées, réseaux sociaux, modes de paiement proposés. Rien n'est écrit en dur dans le front.
+    """
+
+    site_name = models.CharField("nom du site", max_length=60, default="GuinéeMall")
+    tagline = models.CharField("slogan", max_length=150, default="Le marché guinéen, dans votre poche.")
+    announcement = models.CharField(
+        "bandeau d'annonce", max_length=200, blank=True,
+        default="Livraison dans tout Conakry · Paiement protégé jusqu'à la réception",
+    )
+    hero_title = models.CharField("titre de l'accueil", max_length=150, default="Le marché guinéen, dans votre poche.")
+    hero_subtitle = models.TextField(
+        "texte de l'accueil",
+        default="Achetez auprès de boutiques de Conakry et de toute la Guinée. Payez par Orange Money, MTN ou à la livraison.",
+    )
+    hero_image = models.ImageField("image de l'accueil", upload_to="site/", blank=True)
+    contact_phone = models.CharField("téléphone", max_length=20, blank=True)
+    contact_whatsapp = models.CharField("WhatsApp du service client", max_length=20, blank=True)
+    contact_email = models.EmailField("email", blank=True)
+    address = models.CharField("adresse", max_length=200, blank=True, default="Conakry, Guinée")
+    facebook_url = models.URLField(blank=True)
+    instagram_url = models.URLField(blank=True)
+    tiktok_url = models.URLField(blank=True)
+    # Modes de paiement proposés au client
+    enable_cash_on_delivery = models.BooleanField("paiement à la livraison", default=True)
+    enable_orange_money = models.BooleanField("Orange Money", default=True)
+    enable_mtn_momo = models.BooleanField("MTN Mobile Money", default=True)
+    enable_card = models.BooleanField("carte bancaire (diaspora)", default=True)
+
+    class Meta:
+        verbose_name = "réglages du site"
+        verbose_name_plural = "réglages du site"
+
+    def __str__(self):
+        return "Réglages du site"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+        from django.core.cache import cache
+
+        cache.delete("site-settings")
+
+    @classmethod
+    def load(cls):
+        from django.core.cache import cache
+
+        settings = cache.get("site-settings")
+        if settings is None:
+            settings, _ = cls.objects.get_or_create(pk=1)
+            cache.set("site-settings", settings, 300)
+        return settings
+
+    def enabled_payment_methods(self):
+        return [
+            method for method, enabled in (
+                ("orange_money", self.enable_orange_money),
+                ("mtn_momo", self.enable_mtn_momo),
+                ("cash_on_delivery", self.enable_cash_on_delivery),
+                ("card", self.enable_card),
+            ) if enabled
+        ]

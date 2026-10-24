@@ -100,6 +100,11 @@ CACHES = {
     }
 }
 
+TESTING = "test" in sys.argv
+if TESTING:
+    # Les tests ne doivent jamais lire ni écrire le cache du serveur de développement
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -141,8 +146,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 20,
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.Pagination",
 }
 
 SIMPLE_JWT = {
@@ -160,7 +164,7 @@ STATUT_DURATION_HOURS = 24
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = None
 # Pendant les tests, les tâches s'exécutent immédiatement (pas besoin de worker)
-CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default="test" in sys.argv)
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=TESTING)
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     "annuler-commandes-non-payees": {"task": "apps.payments.tasks.expire_unpaid_orders", "schedule": 300},
@@ -211,3 +215,12 @@ WHATSAPP = {
     "TEMPLATE": env("WHATSAPP_TEMPLATE", default="guineemall_notification"),
     "LANGUAGE": "fr",
 }
+
+# Emails (mot de passe oublié). Sans SMTP configuré, les emails s'affichent dans la console.
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="GuinéeMall <no-reply@guineemall.gn>")

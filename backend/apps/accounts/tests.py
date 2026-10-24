@@ -41,3 +41,51 @@ class AuthTests(GuineeMallTestCase):
         self.client.post("/api/auth/addresses/", data)
         self.client.post("/api/auth/addresses/", {**data, "landmark": "Marché Madina"})
         self.assertEqual(user.addresses.filter(is_default=True).count(), 1)
+
+
+class PasswordTests(GuineeMallTestCase):
+    def test_mot_de_passe_oublie(self):
+        import re
+
+        from django.core import mail
+
+        self.make_client("oubli@test.gn")
+        self.client.post("/api/auth/password/reset/", {"email": "OUBLI@test.gn"})
+        self.client.post("/api/auth/password/reset/", {"email": "inconnu@test.gn"})  # même réponse, pas d'email
+        self.assertEqual(len(mail.outbox), 1)
+        uid, token = re.search(r"uid=([\w-]+)&token=([\w-]+)", mail.outbox[0].body).groups()
+
+        r = self.client.post("/api/auth/password/reset/confirm/", {"uid": uid, "token": token, "password": "NouveauMdp2026!"})
+        self.assertEqual(r.status_code, 204)
+        r = self.client.post("/api/auth/password/reset/confirm/", {"uid": uid, "token": token, "password": "Autre2026!!"})
+        self.assertEqual(r.status_code, 400)  # lien à usage unique
+        self.assertEqual(self.client.post("/api/auth/token/", {"email": "oubli@test.gn", "password": "NouveauMdp2026!"}).status_code, 200)
+
+    def test_changer_son_mot_de_passe(self):
+        user = self.make_client()
+        self.client.force_authenticate(user)
+        bad = self.client.post("/api/auth/password/change/", {"current_password": "faux", "new_password": "Nouveau2026!!"})
+        self.assertEqual(bad.status_code, 400)
+        ok = self.client.post("/api/auth/password/change/", {"current_password": "MotDePasse123!", "new_password": "Nouveau2026!!"})
+        self.assertEqual(ok.status_code, 204)
+
+
+class ConfigTests(GuineeMallTestCase):
+    def test_modes_de_paiement_pilotes_par_l_admin(self):
+        from apps.core.models import SiteSettings
+
+        site = SiteSettings.load()
+        site.enable_card = False
+        site.save()
+        config = self.client.get("/api/config/").data
+        self.assertNotIn("card", [m["value"] for m in config["payment_methods"]])
+        self.assertEqual(config["delivery_locations"], [{"city": "Conakry", "communes": ["Ratoma"]}])
+        self.assertEqual(config["choices"]["vendor_order_status"][1]["action"], "Confirmer")
+
+        vendor = self.make_vendor()
+        product = self.make_product(vendor)
+        user = self.make_client()
+        self.client.force_authenticate(user)
+        self.client.post("/api/cart/", {"product_slug": product.slug, "quantity": 1})
+        r = self.client.post("/api/orders/", {"address": self.make_address(user).pk, "payment_method": "card"})
+        self.assertEqual(r.status_code, 400)

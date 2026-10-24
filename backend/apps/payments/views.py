@@ -14,6 +14,7 @@ def payment_data(payment):
         "reference": str(payment.reference),
         "order_id": payment.order_id,
         "provider": payment.provider,
+        "provider_label": payment.get_provider_display(),
         "amount": payment.amount,
         "status": payment.status,
         "simulation": settings.PAYMENT_MODE != "live",

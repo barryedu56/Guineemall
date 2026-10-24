@@ -54,6 +54,13 @@ class CheckoutSerializer(QuoteSerializer):
     affiliate_code = serializers.CharField(required=False, allow_blank=True, max_length=12)
     delivery_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
 
+    def validate_payment_method(self, method):
+        from apps.core.models import SiteSettings
+
+        if method not in SiteSettings.load().enabled_payment_methods():
+            raise serializers.ValidationError("Ce mode de paiement n'est pas disponible pour le moment.")
+        return method
+
 
 class PaySerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
@@ -116,6 +123,7 @@ DELIVERY_FIELDS = [
 
 class OrderSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
+    payment_method_label = serializers.CharField(source="get_payment_method_display", read_only=True)
     payment_status_label = serializers.CharField(source="get_payment_status_display", read_only=True)
     vendor_orders = VendorOrderSerializer(many=True, read_only=True)
     status_history = StatusHistorySerializer(many=True, read_only=True)
@@ -128,7 +136,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             "id", "subtotal", "delivery_fee", "discount_amount", "total_amount", "coupon_code",
-            "status", "status_label", "payment_method", "payment_status", "payment_status_label",
+            "status", "status_label", "payment_method", "payment_method_label", "payment_status", "payment_status_label",
             "awaiting_payment", "can_confirm_reception", "delivery_method", "pickup_point_name",
             "delivery_name", *DELIVERY_FIELDS, "vendor_orders", "status_history", "created_at",
         ]
@@ -153,6 +161,7 @@ class VendorSideOrderSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="order.user.name", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     payment_method = serializers.CharField(source="order.payment_method", read_only=True)
+    payment_method_label = serializers.CharField(source="order.get_payment_method_display", read_only=True)
     payment_status = serializers.CharField(source="order.payment_status", read_only=True)
     delivery_method = serializers.CharField(source="order.delivery_method", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
@@ -165,7 +174,8 @@ class VendorSideOrderSerializer(serializers.ModelSerializer):
         model = VendorOrder
         fields = [
             "id", "order_id", "client_name", "subtotal", "delivery_fee", "vendor_discount", "total_amount",
-            "net_amount", "status", "status_label", "payment_method", "payment_status", "delivery_method",
+            "net_amount", "status", "status_label", "payment_method", "payment_method_label", "payment_status",
+            "delivery_method",
             "items", "delivery", "tracking", "next_statuses", "received_at", "funds_released_at", "created_at",
         ]
 

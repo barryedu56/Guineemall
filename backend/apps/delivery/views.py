@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import generics, mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -86,11 +87,22 @@ class RiderDeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         ).prefetch_related("vendor_order__items")
 
     def get_queryset(self):
+        rider = self.request.user.rider
         if self.action in ("available", "accept"):
-            return self.base_queryset().filter(
-                status=Delivery.Status.OPEN, vendor_order__order__delivery_city__iexact=self.request.user.rider.city
+            if not rider.is_available:
+                return Delivery.objects.none()
+            queryset = self.base_queryset().filter(
+                status=Delivery.Status.OPEN, vendor_order__order__delivery_city__iexact=rider.city
             )
-        return self.base_queryset().filter(rider=self.request.user.rider)
+            communes = [c.strip() for c in rider.communes.split(",") if c.strip()]
+            if communes:
+                # Courses des communes desservies (et celles sans commune précise)
+                match = Q(vendor_order__order__delivery_commune="")
+                for commune in communes:
+                    match |= Q(vendor_order__order__delivery_commune__iexact=commune)
+                queryset = queryset.filter(match)
+            return queryset
+        return self.base_queryset().filter(rider=rider)
 
     @action(detail=False)
     def available(self, request):
