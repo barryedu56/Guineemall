@@ -50,7 +50,8 @@ export default function Layout() {
       <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-up px-4 py-6 sm:py-8">
         <Outlet />
       </main>
-      <Footer />
+      {/* Pied de page uniquement sur l'accueil */}
+      {pathname === '/' && <Footer />}
       <MobileNav />
     </div>
   )
