@@ -42,6 +42,8 @@ class CartViewSet(viewsets.ModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
+        # Articles de sa propre boutique (ajoutés avant d'ouvrir la boutique, par ex.) : retirés
+        CartItem.objects.filter(user=request.user, product__vendor__user=request.user).delete()
         items = self.get_serializer(self.get_queryset(), many=True).data
         return Response({"items": items, "total": sum(i["subtotal"] for i in items)})
 

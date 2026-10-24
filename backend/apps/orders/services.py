@@ -162,6 +162,8 @@ def checkout(user, payment_method, address=None, pickup_point=None, coupon_code=
     lines = []
     for item in cart:
         product = products[item.product_id]
+        if product.is_owned_by(user):
+            raise OrderError(f"« {product.name} » est un produit de votre boutique : retirez-le du panier.")
         if (
             product.is_deleted
             or product.status != Product.Status.ACTIVE

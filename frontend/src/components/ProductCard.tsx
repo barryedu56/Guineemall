@@ -1,7 +1,8 @@
-import { Heart, ImageOff, Plus } from 'lucide-react'
+import { Heart, ImageOff, Pencil, Plus } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useCart } from '../context/cart'
+import { useIsOwnShop } from '../context/ownership'
 import { useToast } from '../context/toast'
 import { errorMessage } from '../lib/api'
 import { useFavorites } from '../lib/queries'
@@ -17,6 +18,7 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
   const favorites = useFavorites()
   const discount = product.compare_at_price ? Math.round((1 - product.price / product.compare_at_price) * 100) : 0
   const favorite = favorites.isFavorite(product.slug)
+  const own = useIsOwnShop(product.vendor)
 
   async function addToCart() {
     try {
@@ -48,15 +50,23 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
           {discount > 0 && <span className="rounded-full bg-danger px-2 py-0.5 text-xs font-bold text-white">-{discount}%</span>}
           {product.stock === 0 && <span className="rounded-full bg-ink/80 px-2 py-0.5 text-xs font-bold text-white">Épuisé</span>}
         </div>
-        <button
+        {!own && <button
           onClick={toggleFavorite}
           className="absolute right-2.5 top-2.5 flex size-9 items-center justify-center rounded-full bg-surface/90 shadow-sm backdrop-blur transition hover:scale-110"
           aria-label={favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
           aria-pressed={favorite}
         >
           <Heart className={`size-[18px] ${favorite ? 'fill-danger text-danger' : 'text-ink/70'}`} />
-        </button>
-        {product.stock > 0 && (
+        </button>}
+        {own ? (
+          // Produit du vendeur connecté : modifier au lieu d'acheter
+          <Link
+            to={`/vendeur/produits?modifier=${product.id}`}
+            className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white shadow-lift transition hover:bg-ink/90"
+          >
+            <Pencil className="size-3.5" /> Modifier
+          </Link>
+        ) : product.stock > 0 && (
           <button
             onClick={addToCart}
             className="absolute bottom-2.5 right-2.5 flex size-10 items-center justify-center rounded-full bg-primary shadow-lift transition hover:scale-110 hover:bg-primary-hover active:scale-95 md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100"

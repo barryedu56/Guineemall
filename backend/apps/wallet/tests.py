@@ -95,6 +95,13 @@ class EscrowTests(OrderTestCase):
             self.client.post(f"/api/orders/{order_id}/confirm-reception/")
         self.assertEqual(balance(ambassadeur), round(700_000 * 0.02))
 
+    def test_pas_de_commission_ambassadeur_pour_la_boutique_elle_meme(self):
+        order_id, vo = self.paid_order(affiliate_code=self.madina.user.referral_code)
+        self.deliver(self.madina, vo)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(f"/api/orders/{order_id}/confirm-reception/")
+        self.assertFalse(LedgerEntry.objects.filter(user=self.madina.user, kind="affiliate").exists())
+
     def test_on_ne_peut_pas_etre_son_propre_ambassadeur(self):
         order_id, _ = self.paid_order(affiliate_code=self.user.referral_code)
         self.assertIsNone(VendorOrder.objects.get(order_id=order_id).order.affiliate)

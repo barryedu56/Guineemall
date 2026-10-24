@@ -69,6 +69,10 @@ class Product(TimeStampedModel, SoftDeleteModel):
     def in_stock(self):
         return self.stock > 0
 
+    def is_owned_by(self, user):
+        """Vrai si l'utilisateur est le vendeur de ce produit (il ne peut ni l'acheter ni le mettre en favori)."""
+        return user.is_authenticated and self.vendor.user_id == user.pk
+
     @property
     def main_image(self):
         return self.images.first()

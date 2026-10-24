@@ -128,3 +128,43 @@ class VendorOrderTests(OrderTestCase):
         data = self.client.get("/api/vendor/orders/").data["results"][0]
         self.assertEqual(data["delivery"]["quartier"], "Kipé")
         self.assertEqual(data["next_statuses"], ["confirmed", "cancelled"])
+
+
+class OwnShopTests(OrderTestCase):
+    """Un vendeur reste un client des autres boutiques, mais pas de la sienne."""
+
+    def test_vendeur_ne_peut_pas_acheter_ses_produits(self):
+        self.client.force_authenticate(self.kipe.user)
+        r = self.client.post("/api/cart/", {"product_slug": self.tel.slug, "quantity": 1})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("propre boutique", str(r.data))
+        # Il peut acheter chez une autre boutique
+        self.assertEqual(self.client.post("/api/cart/", {"product_slug": self.riz.slug, "quantity": 1}).status_code, 201)
+
+    def test_commande_refusee_si_le_panier_contient_ses_produits(self):
+        from apps.orders.models import CartItem
+
+        CartItem.objects.create(user=self.kipe.user, product=self.tel, quantity=1)  # ajouté avant la règle
+        self.client.force_authenticate(self.kipe.user)
+        address = self.make_address(self.kipe.user)
+        r = self.client.post("/api/orders/", {"address": address.pk, "payment_method": "cash_on_delivery"})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("votre boutique", r.data["detail"])
+
+    def test_panier_nettoye_de_ses_propres_produits(self):
+        from apps.orders.models import CartItem
+
+        CartItem.objects.create(user=self.kipe.user, product=self.tel, quantity=1)
+        CartItem.objects.create(user=self.kipe.user, product=self.riz, quantity=1)
+        self.client.force_authenticate(self.kipe.user)
+        items = self.client.get("/api/cart/").data["items"]
+        self.assertEqual([i["product"]["slug"] for i in items], [self.riz.slug])
+
+    def test_pas_de_favori_sur_ses_produits(self):
+        self.client.force_authenticate(self.kipe.user)
+        self.assertEqual(self.client.post(f"/api/favorites/{self.tel.slug}/").status_code, 400)
+
+    def test_produit_d_une_boutique_non_approuvee_hors_panier(self):
+        self.madina.status = "suspended"
+        self.madina.save()
+        self.assertEqual(self.add(self.riz, 1).status_code, 400)

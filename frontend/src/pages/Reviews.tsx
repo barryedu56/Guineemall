@@ -8,7 +8,7 @@ import { useAuth } from '../context/auth'
 import { api, errorMessage, formatDate } from '../lib/api'
 import type { Paginated, Review } from '../lib/types'
 
-export default function Reviews({ slug }: { slug: string }) {
+export default function Reviews({ slug, canReview = true }: { slug: string; canReview?: boolean }) {
   const { user } = useAuth()
   const [writing, setWriting] = useState(false)
   const { data } = useQuery({
@@ -20,7 +20,7 @@ export default function Reviews({ slug }: { slug: string }) {
     <section id="avis" className="mt-10 scroll-mt-24">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold">Avis clients ({data?.count ?? 0})</h2>
-        {user && !writing && (
+        {user && canReview && !writing && (
           <Button variant="outline" onClick={() => setWriting(true)}>Donner mon avis</Button>
         )}
       </div>

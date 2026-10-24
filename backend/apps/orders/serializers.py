@@ -14,7 +14,10 @@ class CartItemSerializer(serializers.ModelSerializer):
     product = ProductListSerializer(read_only=True)
     product_slug = serializers.SlugRelatedField(
         source="product", slug_field="slug", write_only=True,
-        queryset=Product.objects.alive().filter(status=Product.Status.ACTIVE),
+        # Seuls les produits visibles (actifs, boutique approuvée) peuvent aller au panier
+        queryset=Product.objects.alive().filter(
+            status=Product.Status.ACTIVE, vendor__status="approved", vendor__deleted_at__isnull=True
+        ).select_related("vendor"),
     )
     quantity = serializers.IntegerField(min_value=1)
     subtotal = serializers.IntegerField(read_only=True)
@@ -25,6 +28,8 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         product = attrs.get("product", getattr(self.instance, "product", None))
+        if product and product.is_owned_by(self.context["request"].user):
+            raise serializers.ValidationError({"product_slug": "Vous ne pouvez pas acheter un produit de votre propre boutique."})
         if product and attrs.get("quantity", 1) > product.stock:
             raise serializers.ValidationError({"quantity": f"Il ne reste que {product.stock} en stock."})
         return attrs

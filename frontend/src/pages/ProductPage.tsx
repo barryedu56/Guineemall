@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, ChevronRight, Heart, ImageOff, MessageCircle, MessagesSquare, Minus, Plus, ShieldCheck, ShoppingBag, Truck } from 'lucide-react'
+import { BadgeCheck, ChevronRight, Eye, Heart, ImageOff, MessageCircle, MessagesSquare, Minus, Pencil, Plus, ShieldCheck, ShoppingBag, Truck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -11,6 +11,7 @@ import { ShopAvatar } from '../components/Statuts'
 import { Button, SectionHeader, Skeleton } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
+import { useIsOwnShop } from '../context/ownership'
 import { useSiteConfig } from '../context/settings'
 import { useToast } from '../context/toast'
 import { api, errorMessage } from '../lib/api'
@@ -48,6 +49,8 @@ function ProductView({ product }: { product: ProductDetail }) {
   const { data: config } = useSiteConfig()
   const [imageIndex, setImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
+  // Le vendeur qui consulte son propre produit le gère, il ne l'achète pas
+  const own = useIsOwnShop(product.vendor.slug)
 
   const { data: related } = useQuery({
     queryKey: ['products', 'related', product.category.slug],
@@ -149,6 +152,30 @@ function ProductView({ product }: { product: ProductDetail }) {
             {product.stock > 0 ? `En stock · ${product.stock} disponible${product.stock > 1 ? 's' : ''}` : 'Épuisé'}
           </p>
 
+          {own ? (
+            <div className="card space-y-4 p-5">
+              <p className="flex items-center gap-2 text-sm font-medium text-ink/70">
+                <Eye className="size-4" /> Aperçu de votre produit tel que vos clients le voient.
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-2xl bg-background p-3">
+                  <p className="text-ink/55">Stock</p>
+                  <p className={`text-lg font-bold ${product.stock === 0 ? 'text-danger' : ''}`}>{product.stock === 0 ? 'Épuisé' : product.stock}</p>
+                </div>
+                <div className="rounded-2xl bg-background p-3">
+                  <p className="text-ink/55">Avis</p>
+                  <p className="text-lg font-bold">{product.reviews_count}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link to={`/vendeur/produits?modifier=${product.id}`} className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-semibold text-white hover:bg-ink/90">
+                  <Pencil className="size-4" /> Modifier ce produit
+                </Link>
+                <ShareButton slug={product.slug} name={product.name} />
+              </div>
+            </div>
+          ) : (
+            <>
           {product.stock > 0 && (
             <div className="flex items-center gap-4">
               <span className="font-semibold">Quantité</span>
@@ -185,6 +212,8 @@ function ProductView({ product }: { product: ProductDetail }) {
               </a>
             )}
           </div>
+            </>
+          )}
 
           {config && (
             <div className="card divide-y divide-ink/5">
@@ -199,7 +228,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             </div>
           )}
 
-          <Link to={`/boutique/${product.vendor.slug}`} className="card card-hover flex items-center gap-4 p-4">
+          {!own && <Link to={`/boutique/${product.vendor.slug}`} className="card card-hover flex items-center gap-4 p-4">
             <ShopAvatar logo={product.vendor.logo} name={product.vendor.shop_name} className="size-14" />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wider text-ink/45">Vendu par</p>
@@ -210,7 +239,7 @@ function ProductView({ product }: { product: ProductDetail }) {
               {product.vendor.rating ? <Stars rating={product.vendor.rating} count={product.vendor.reviews_count} /> : null}
             </div>
             <ChevronRight className="size-5 text-ink/40" />
-          </Link>
+          </Link>}
 
           <div>
             <h2 className="mb-2 text-lg font-bold">Description</h2>
@@ -233,7 +262,7 @@ function ProductView({ product }: { product: ProductDetail }) {
         </div>
       </div>
 
-      <Reviews slug={product.slug} />
+      <Reviews slug={product.slug} canReview={!own} />
 
       {!!related?.results.filter((p) => p.slug !== product.slug).length && (
         <section className="mt-12">
@@ -243,7 +272,7 @@ function ProductView({ product }: { product: ProductDetail }) {
       )}
 
       {/* Barre d'achat fixe sur mobile */}
-      {product.stock > 0 && (
+      {product.stock > 0 && !own && (
         <div className="fixed inset-x-0 bottom-16 z-30 flex gap-2 border-t border-ink/5 bg-surface/95 p-3 backdrop-blur-xl sm:hidden">
           <Button variant="dark" className="flex-1" onClick={() => addToCart(true)}>Acheter</Button>
           <Button className="flex-1" onClick={() => addToCart(false)}><ShoppingBag className="size-5" /> Panier</Button>

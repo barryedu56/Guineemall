@@ -65,7 +65,8 @@ def release_funds(vendor_order):
         rider_amount = vendor_order.delivery_fee - (vendor_order.total_amount if cash else 0)
         _credit(rider.user, LedgerEntry.Kind.DELIVERY, rider_amount, vendor_order, f"Livraison commande #{order.id}")
 
-    if order.affiliate_id:
+    # Pas de commission d'ambassadeur à une boutique sur ses propres ventes
+    if order.affiliate_id and order.affiliate_id != vendor_order.vendor.user_id:
         affiliate_amount = round((vendor_order.subtotal - vendor_order.vendor_discount) * settings.AFFILIATE_COMMISSION_RATE)
         _credit(order.affiliate, LedgerEntry.Kind.AFFILIATE, affiliate_amount, vendor_order, f"Vente commande #{order.id}")
         notify(order.affiliate, "wallet", "Commission ambassadeur 🎉",

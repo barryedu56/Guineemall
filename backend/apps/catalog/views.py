@@ -190,6 +190,8 @@ class FavoriteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def toggle(self, request, slug=None):
         product = generics.get_object_or_404(public_products(), slug=slug)
         if request.method == "POST":
+            if product.is_owned_by(request.user):
+                raise ValidationError({"detail": "C'est un produit de votre boutique."})
             Favorite.objects.get_or_create(user=request.user, product=product)
             return Response(status=status.HTTP_201_CREATED)
         Favorite.objects.filter(user=request.user, product=product).delete()

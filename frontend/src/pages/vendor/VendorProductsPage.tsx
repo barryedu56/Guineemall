@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ImageOff, ImagePlus, Package, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { AmountInput, Badge, Button, Empty, ErrorBox, Input, Pager, Select, Spinner, Textarea } from '../../components/ui'
 import { api, errorMessage, formatGNF } from '../../lib/api'
@@ -8,7 +9,9 @@ import { useCategories } from '../../lib/queries'
 import type { Paginated, VendorProduct } from '../../lib/types'
 
 export default function VendorProductsPage() {
-  const [editing, setEditing] = useState<VendorProduct | 'new' | null>(null)
+  // Produit à modifier dans l'adresse (?modifier=12, ou ?modifier=nouveau) : ouvrable depuis la fiche produit
+  const [params, setParams] = useSearchParams()
+  const target = params.get('modifier')
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const { data, isLoading } = useQuery({
@@ -17,7 +20,18 @@ export default function VendorProductsPage() {
     placeholderData: keepPreviousData,
   })
 
-  if (editing) return <ProductForm product={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+  const { data: targetProduct, isLoading: loadingTarget, isError } = useQuery({
+    queryKey: ['vendor-products', 'detail', target],
+    queryFn: async () => (await api.get<VendorProduct>(`/vendor/products/${target}/`)).data,
+    enabled: !!target && target !== 'nouveau',
+  })
+  const openEditor = (id: number | 'nouveau') => setParams({ modifier: String(id) })
+  const closeEditor = () => setParams({}, { replace: true })
+
+  if (target === 'nouveau') return <ProductForm product={null} onDone={closeEditor} />
+  if (target && loadingTarget) return <Spinner />
+  if (target && targetProduct) return <ProductForm key={targetProduct.id} product={targetProduct} onDone={closeEditor} />
+  if (target && isError) return <Empty icon={<Package />} title="Ce produit n'existe pas ou n'est pas à vous" />
   if (isLoading) return <Spinner />
 
   return (
@@ -35,7 +49,7 @@ export default function VendorProductsPage() {
             className="w-full rounded-full bg-surface py-2.5 pl-10 pr-4 shadow-sm outline-none focus:ring-4 focus:ring-primary/25"
           />
         </div>
-        <Button onClick={() => setEditing('new')}>
+        <Button onClick={() => openEditor('nouveau')}>
           <Plus className="size-5" /> Nouveau produit
         </Button>
       </div>
@@ -61,7 +75,7 @@ export default function VendorProductsPage() {
                 </p>
               </div>
               {p.status === 'inactive' && <Badge>Masqué</Badge>}
-              <Button variant="ghost" onClick={() => setEditing(p)} aria-label="Modifier">
+              <Button variant="ghost" onClick={() => openEditor(p.id)} aria-label="Modifier">
                 <Pencil className="size-4" />
               </Button>
             </li>

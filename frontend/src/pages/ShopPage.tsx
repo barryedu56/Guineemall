@@ -1,12 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Crown, MessageCircle, MessagesSquare, Package, Star } from 'lucide-react'
+import { BadgeCheck, Crown, Eye, MessageCircle, MessagesSquare, Package, Pencil, Plus, Star } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { ProductGrid, ProductGridSkeleton } from '../components/ProductCard'
 import { ShopAvatar } from '../components/Statuts'
 import { Badge, Button, Empty, Pager, Skeleton } from '../components/ui'
 import { useAuth } from '../context/auth'
+import { useIsOwnShop } from '../context/ownership'
 import { useToast } from '../context/toast'
 import { api, errorMessage, formatNumber } from '../lib/api'
 import type { Conversation, Paginated, ProductSummary, Shop } from '../lib/types'
@@ -18,6 +19,7 @@ export default function ShopPage() {
   const toast = useToast()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
+  const own = useIsOwnShop(slug)
 
   const { data: shop, isLoading } = useQuery({
     queryKey: ['shop', slug],
@@ -44,6 +46,11 @@ export default function ShopPage() {
 
   return (
     <>
+      {own && (
+        <p className="mb-4 flex items-center gap-2 rounded-2xl bg-primary-light px-4 py-3 text-sm font-medium">
+          <Eye className="size-4 shrink-0" /> Aperçu : votre boutique telle que vos clients la voient. Les achats y sont désactivés pour vous.
+        </p>
+      )}
       <section className="card mb-8 overflow-hidden">
         <div className="h-28 bg-linear-to-r from-primary via-secondary to-primary-dark sm:h-36" />
         <div className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:items-end">
@@ -63,14 +70,27 @@ export default function ShopPage() {
             </div>
             {shop.description && <p className="mt-3 max-w-2xl text-ink/75">{shop.description}</p>}
           </div>
-          <div className="flex gap-2">
-            <Button variant="dark" loading={contact.isPending} onClick={() => (user ? contact.mutate() : navigate(`/connexion?suivant=/boutique/${slug}`))}>
-              <MessagesSquare className="size-4" /> Écrire
-            </Button>
-            {whatsapp && (
-              <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 font-semibold text-white hover:opacity-90">
-                <MessageCircle className="size-4" /> WhatsApp
-              </a>
+          <div className="flex flex-wrap gap-2">
+            {own ? (
+              <>
+                <Link to="/vendeur/boutique" className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-semibold text-white hover:bg-ink/90">
+                  <Pencil className="size-4" /> Modifier ma boutique
+                </Link>
+                <Link to="/vendeur/produits?modifier=nouveau" className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-semibold hover:bg-primary-hover">
+                  <Plus className="size-4" /> Ajouter un produit
+                </Link>
+              </>
+            ) : (
+              <>
+                <Button variant="dark" loading={contact.isPending} onClick={() => (user ? contact.mutate() : navigate(`/connexion?suivant=/boutique/${slug}`))}>
+                  <MessagesSquare className="size-4" /> Écrire
+                </Button>
+                {whatsapp && (
+                  <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 font-semibold text-white hover:opacity-90">
+                    <MessageCircle className="size-4" /> WhatsApp
+                  </a>
+                )}
+              </>
             )}
           </div>
         </div>
