@@ -1,23 +1,32 @@
+from django.db.models import Avg, Count, Q
+from django.http import HttpResponse
 from rest_framework import generics, mixins, parsers, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from apps.core.permissions import IsVendeur, get_vendor
+from apps.notifications.services import notify
+from apps.orders.models import OrderItem, VendorOrder
 from apps.vendors.models import Vendor
 
+from . import stats
 from .filters import ProductFilter
-from .models import Category, Favorite, Product
+from .models import Category, Favorite, Product, Review
 from .serializers import (
     CategorySerializer,
     ProductDetailSerializer,
     ProductImageSerializer,
     ProductListSerializer,
+    ReviewSerializer,
     VendorProductSerializer,
 )
+from .share import build_share_image
 
 
 def public_products():
     """Produits visibles par tous : actifs, non supprimés, d'une boutique approuvée."""
+    visible = Q(reviews__is_visible=True)
     return (
         Product.objects.alive()
         .filter(
@@ -25,6 +34,7 @@ def public_products():
             vendor__status=Vendor.Status.APPROVED,
             vendor__deleted_at__isnull=True,
         )
+        .annotate(rating=Avg("reviews__rating", filter=visible), reviews_count=Count("reviews", filter=visible))
         .select_related("vendor", "category")
         .prefetch_related("images")
     )
@@ -48,6 +58,66 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         return ProductDetailSerializer if self.action == "retrieve" else ProductListSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        stats.record_view(response.data["id"])
+        return response
+
+    @action(detail=True, methods=["get", "post"], permission_classes=[permissions.IsAuthenticatedOrReadOnly],
+            parser_classes=[parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser])
+    def reviews(self, request, slug=None):
+        """GET : avis du produit · POST : laisser un avis (uniquement après l'avoir reçu)."""
+        product = self.get_object()
+        if request.method == "GET":
+            reviews = product.reviews.filter(is_visible=True).select_related("user").prefetch_related("photos")
+            page = self.paginate_queryset(reviews)
+            return self.get_paginated_response(ReviewSerializer(page, many=True, context={"request": request}).data)
+
+        bought = OrderItem.objects.filter(
+            product=product, order__user=request.user, vendor_order__status=VendorOrder.Status.DELIVERED
+        ).exists()
+        if not bought:
+            raise ValidationError({"detail": "Seuls les clients qui ont reçu ce produit peuvent laisser un avis."})
+        if product.reviews.filter(user=request.user).exists():
+            raise ValidationError({"detail": "Vous avez déjà laissé un avis sur ce produit."})
+        serializer = ReviewSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        review = serializer.save(product=product, user=request.user)
+        notify(product.vendor.user, "review", f"Nouvel avis {review.rating}★ sur « {product.name} »",
+               review.comment[:140], f"/produit/{product.slug}", whatsapp=False)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, url_path="share-image")
+    def share_image(self, request, slug=None):
+        """Image carrée prête à poster en statut WhatsApp, sur Facebook ou TikTok."""
+        product = self.get_object()
+        return HttpResponse(build_share_image(product), content_type="image/jpeg")
+
+
+class VendorReviewViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """Avis reçus par la boutique, avec possibilité de répondre."""
+
+    serializer_class = ReviewSerializer
+    permission_classes = [IsVendeur]
+
+    def get_queryset(self):
+        return Review.objects.filter(product__vendor=get_vendor(self.request)).select_related("user", "product")
+
+    def list(self, request, *args, **kwargs):
+        page = self.paginate_queryset(self.get_queryset())
+        data = [
+            {**ReviewSerializer(r, context={"request": request}).data, "product": {"slug": r.product.slug, "name": r.product.name}}
+            for r in page
+        ]
+        return self.get_paginated_response(data)
+
+    @action(detail=True, methods=["post"])
+    def reply(self, request, pk=None):
+        review = self.get_object()
+        review.vendor_reply = str(request.data.get("reply", ""))[:1000]
+        review.save(update_fields=["vendor_reply", "updated_at"])
+        return Response(ReviewSerializer(review, context={"request": request}).data)
 
 
 class VendorProductViewSet(viewsets.ModelViewSet):
@@ -96,3 +166,11 @@ class FavoriteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             return Response(status=status.HTTP_201_CREATED)
         Favorite.objects.filter(user=request.user, product=product).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class VendorStatsViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsVendeur]
+
+    def list(self, request):
+        days = min(int(request.query_params.get("days", 30)), 365)
+        return Response(stats.vendor_dashboard(get_vendor(request), days))

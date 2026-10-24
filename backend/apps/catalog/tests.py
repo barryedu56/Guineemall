@@ -50,3 +50,49 @@ class CatalogTests(GuineeMallTestCase):
         self.assertEqual(self.client.get("/api/favorites/").data["count"], 1)
         self.client.delete(f"/api/favorites/{product.slug}/")
         self.assertEqual(self.client.get("/api/favorites/").data["count"], 0)
+
+
+class ReviewTests(GuineeMallTestCase):
+    def setUp(self):
+        from apps.orders.models import Order, OrderItem, VendorOrder
+
+        self.vendor = self.make_vendor()
+        self.product = self.make_product(self.vendor)
+        self.user = self.make_client()
+        order = Order.objects.create(user=self.user, total_amount=1, delivery_city="Conakry", delivery_landmark="x",
+                                     delivery_phone="620")
+        self.vo = VendorOrder.objects.create(order=order, vendor=self.vendor, total_amount=1)
+        OrderItem.objects.create(order=order, vendor_order=self.vo, product=self.product, product_name="x",
+                                 unit_price=1, quantity=1)
+        self.url = f"/api/products/{self.product.slug}/reviews/"
+        self.client.force_authenticate(self.user)
+
+    def test_avis_seulement_apres_reception(self):
+        self.assertEqual(self.client.post(self.url, {"rating": 5}).status_code, 400)
+        self.vo.status = "delivered"
+        self.vo.save()
+        r = self.client.post(self.url, {"rating": 4, "comment": "Très bon téléphone"})
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["author"], "Client T.")
+        self.assertEqual(self.client.post(self.url, {"rating": 5}).status_code, 400)  # un seul avis
+
+        product = self.client.get(f"/api/products/{self.product.slug}/").data
+        self.assertEqual((product["rating"], product["reviews_count"]), (4.0, 1))
+
+        self.client.force_authenticate(self.vendor.user)
+        review_id = self.client.get("/api/vendor/reviews/").data["results"][0]["id"]
+        self.client.post(f"/api/vendor/reviews/{review_id}/reply/", {"reply": "Merci !"})
+        self.client.logout()
+        self.assertEqual(self.client.get(self.url).data["results"][0]["vendor_reply"], "Merci !")
+
+    def test_vues_et_statistiques(self):
+        self.client.get(f"/api/products/{self.product.slug}/")
+        self.client.get(f"/api/products/{self.product.slug}/")
+        self.client.force_authenticate(self.vendor.user)
+        stats = self.client.get("/api/vendor/stats/").data
+        self.assertEqual(stats["views"], 2)
+        self.assertEqual(stats["orders"], 1)
+
+    def test_image_de_partage(self):
+        r = self.client.get(f"/api/products/{self.product.slug}/share-image/")
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "image/jpeg"))

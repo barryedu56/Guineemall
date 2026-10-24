@@ -13,10 +13,32 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from PIL import Image, ImageDraw, ImageFont
 
+from datetime import timedelta
+
+from django.utils import timezone
+
 from apps.accounts.models import Address, User
 from apps.catalog.models import Category, Product, ProductImage
+from apps.delivery.models import DeliveryZone, PickupPoint, Rider
+from apps.promotions.models import Campaign, Coupon
 from apps.statuts.models import Statut
 from apps.vendors.models import Vendor
+
+# Tarifs indicatifs à ajuster dans l'admin (Livraison › Zones de livraison)
+DELIVERY_ZONES = [
+    ("Conakry", "Kaloum", 25_000), ("Conakry", "Dixinn", 20_000), ("Conakry", "Matam", 20_000),
+    ("Conakry", "Ratoma", 15_000), ("Conakry", "Matoto", 20_000), ("Conakry", "Sonfonia", 25_000),
+    ("Conakry", "Gbessia", 20_000), ("Conakry", "Tombolia", 30_000), ("Conakry", "Lambanyi", 25_000),
+    ("Conakry", "", 30_000), ("Coyah", "", 40_000), ("Dubréka", "", 40_000), ("Kindia", "", 60_000),
+    ("Boké", "", 80_000), ("Mamou", "", 80_000), ("Labé", "", 100_000), ("Kankan", "", 120_000),
+    ("Faranah", "", 100_000), ("N'Zérékoré", "", 130_000),
+]
+
+PICKUP_POINTS = [
+    ("Relais Bambeto", "Ratoma", "Carrefour Bambeto, à côté de la pharmacie", "620101010", 5_000),
+    ("Relais Madina", "Matam", "Marché Madina, entrée principale", "620202020", 5_000),
+    ("Relais Kaloum", "Kaloum", "Avenue de la République, immeuble Sonoco", "620303030", 7_000),
+]
 
 DEMO_PASSWORD = "demo1234"
 
@@ -139,6 +161,32 @@ class Command(BaseCommand):
                 )
                 statut.media.save("statut.jpg", placeholder(caption, shop["color"], size=(720, 1280)), save=True)
 
+        for city, commune, fee in DELIVERY_ZONES:
+            DeliveryZone.objects.get_or_create(city=city, commune=commune, defaults={"fee": fee})
+        for name, commune, address, phone, fee in PICKUP_POINTS:
+            PickupPoint.objects.get_or_create(
+                name=name, defaults={"city": "Conakry", "commune": commune, "address": address, "phone": phone, "fee": fee}
+            )
+
+        coupon, _ = Coupon.objects.get_or_create(
+            code="BIENVENUE", defaults={"value": 10, "max_discount": 50_000, "description": "10 % sur la 1re commande"}
+        )
+        if not Campaign.objects.filter(name="Spécial Tabaski").exists():
+            now = timezone.now()
+            campaign = Campaign.objects.create(
+                name="Spécial Tabaski", description="Bazin, boubous et produits du terroir pour la fête.",
+                starts_at=now - timedelta(days=1), ends_at=now + timedelta(days=14), coupon=coupon, color="#EF6C00",
+            )
+            campaign.products.set(Product.objects.filter(category__name__in=["Mode", "Alimentation"]))
+
+        rider_user, created = User.objects.get_or_create(
+            email="livreur@demo.gn", defaults={"name": "Ibrahima Kouyaté", "role": User.Role.LIVREUR, "phone": "624000000"}
+        )
+        if created:
+            rider_user.set_password(DEMO_PASSWORD)
+            rider_user.save()
+            Rider.objects.create(user=rider_user, communes="Ratoma, Dixinn, Matam", vehicle_plate="RC-1234-A", is_approved=True)
+
         client, created = User.objects.get_or_create(email="client@demo.gn", defaults={"name": "Aïssatou Sow"})
         if created:
             client.set_password(DEMO_PASSWORD)
@@ -150,6 +198,7 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS("Données de démonstration prêtes."))
-        self.stdout.write(f"  Client  : client@demo.gn / {DEMO_PASSWORD}")
+        self.stdout.write(f"  Client  : client@demo.gn / {DEMO_PASSWORD}  (code promo : BIENVENUE)")
+        self.stdout.write(f"  Livreur : livreur@demo.gn / {DEMO_PASSWORD}")
         for shop in SHOPS:
             self.stdout.write(f"  Vendeur : {shop['email']} / {DEMO_PASSWORD}  ({shop['shop_name']})")

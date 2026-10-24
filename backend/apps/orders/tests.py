@@ -1,4 +1,4 @@
-from apps.core.tests_utils import GuineeMallTestCase
+from apps.core.tests_utils import DELIVERY_FEE, GuineeMallTestCase
 from apps.orders.models import Order, VendorOrder
 
 
@@ -17,8 +17,8 @@ class OrderTestCase(GuineeMallTestCase):
     def add(self, product, quantity):
         return self.client.post("/api/cart/", {"product_slug": product.slug, "quantity": quantity})
 
-    def checkout(self):
-        return self.client.post("/api/orders/", {"address": self.address.pk, "payment_method": "orange_money"})
+    def checkout(self, payment_method="cash_on_delivery", **extra):
+        return self.client.post("/api/orders/", {"address": self.address.pk, "payment_method": payment_method, **extra})
 
 
 class CheckoutTests(OrderTestCase):
@@ -38,7 +38,8 @@ class CheckoutTests(OrderTestCase):
         r = self.checkout()
         self.assertEqual(r.status_code, 201, r.data)
 
-        self.assertEqual(r.data["total_amount"], 2 * 1_500_000 + 350_000)
+        # Chaque boutique livre sa partie : frais de livraison x 2
+        self.assertEqual(r.data["total_amount"], 2 * 1_500_000 + 350_000 + 2 * DELIVERY_FEE)
         self.assertEqual(r.data["delivery_landmark"], "Derrière la mosquée")
         self.assertEqual(sorted(vo["shop_name"] for vo in r.data["vendor_orders"]), ["Kipé", "Madina"])
         self.tel.refresh_from_db()
@@ -95,7 +96,8 @@ class VendorOrderTests(OrderTestCase):
 
     def set_status(self, vendor, vo, new_status):
         self.client.force_authenticate(vendor.user)
-        return self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status})
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status})
 
     def test_parcours_complet_jusqu_a_livree(self):
         for s in ["confirmed", "preparing", "ready", "delivered"]:

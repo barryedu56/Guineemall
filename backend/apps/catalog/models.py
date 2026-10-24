@@ -96,3 +96,36 @@ class Favorite(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user", "product"], name="unique_favorite"),
         ]
+
+
+class Review(TimeStampedModel):
+    """Avis d'un client qui a reçu le produit (acheteur vérifié)."""
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews")
+    rating = models.PositiveSmallIntegerField("note", choices=[(i, f"{i} ★") for i in range(1, 6)])
+    comment = models.TextField("commentaire", blank=True)
+    vendor_reply = models.TextField("réponse de la boutique", blank=True)
+    is_visible = models.BooleanField("visible", default=True, help_text="Décocher pour masquer un avis abusif")
+
+    class Meta:
+        verbose_name = "avis"
+        verbose_name_plural = "avis"
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["product", "user"], name="unique_review")]
+
+
+class ReviewPhoto(models.Model):
+    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to="reviews/")
+
+
+class ProductDailyStat(models.Model):
+    """Nombre de vues d'un produit par jour (tableau de bord vendeur)."""
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="daily_stats")
+    date = models.DateField()
+    views = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["product", "date"], name="unique_product_day")]

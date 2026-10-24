@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -6,12 +6,17 @@ from rest_framework.response import Response
 
 from apps.core.permissions import IsVendeur, get_vendor
 
+from apps.payments.providers import PaymentError
+from apps.payments.services import start_payment
+
 from . import services
 from .models import CartItem, Order, OrderItem, VendorOrder
 from .serializers import (
     CartItemSerializer,
     CheckoutSerializer,
     OrderSerializer,
+    PaySerializer,
+    QuoteSerializer,
     VendorOrderStatusSerializer,
     VendorSideOrderSerializer,
 )
@@ -62,8 +67,11 @@ class CartViewSet(viewsets.ModelViewSet):
 
 
 def with_details(queryset):
-    return queryset.prefetch_related(
-        Prefetch("vendor_orders", queryset=VendorOrder.objects.select_related("vendor")),
+    return queryset.select_related("coupon", "pickup_point").prefetch_related(
+        Prefetch(
+            "vendor_orders",
+            queryset=VendorOrder.objects.select_related("vendor", "delivery__rider__user"),
+        ),
         Prefetch("vendor_orders__items", queryset=OrderItem.objects.select_related("product")),
         "status_history",
     )
@@ -88,6 +96,52 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
             raise ValidationError({"detail": str(e)})
         return Response(self.get_serializer(self.get_queryset().get(pk=order.pk)).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=["post"])
+    def quote(self, request):
+        """Détail du prix (articles, livraison, réduction) avant de confirmer."""
+        payload = QuoteSerializer(data=request.data, context={"request": request})
+        payload.is_valid(raise_exception=True)
+        cart = CartItem.objects.filter(user=request.user).select_related("product__vendor")
+        lines = [(item.product, item.quantity) for item in cart]
+        if not lines:
+            raise ValidationError({"detail": "Votre panier est vide."})
+        try:
+            quote = services.build_quote(request.user, lines, **payload.validated_data)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response({
+            "subtotal": quote.subtotal,
+            "delivery_fee": quote.delivery_fee,
+            "discount": quote.discount,
+            "total": quote.total,
+            "delivery_delay": quote.delivery_delay,
+            "coupon": quote.coupon.code if quote.coupon else None,
+            "coupon_error": quote.coupon_error,
+            "shops": [
+                {"shop_name": v.vendor.shop_name, "subtotal": v.subtotal, "delivery_fee": v.delivery_fee}
+                for v in quote.vendors
+            ],
+        })
+
+    @action(detail=True, methods=["post"])
+    def pay(self, request, pk=None):
+        """Lance (ou relance) le paiement en ligne. Renvoie l'URL de paiement ou un message."""
+        payload = PaySerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        try:
+            payment, init = start_payment(self.get_object(), payload.validated_data.get("phone", ""))
+        except PaymentError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response({"reference": str(payment.reference), "redirect_url": init.redirect_url, "message": init.message})
+
+    @action(detail=True, methods=["post"], url_path="confirm-reception")
+    def confirm_reception(self, request, pk=None):
+        try:
+            services.confirm_reception(self.get_object(), request.user)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
+
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         try:
@@ -105,9 +159,16 @@ class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, views
     filterset_fields = ["status"]
 
     def get_queryset(self):
+        # Une commande payable en ligne n'apparaît qu'une fois payée
         return (
             get_vendor(self.request).vendor_orders
-            .select_related("order__user")
+            .filter(
+                Q(order__payment_method=Order.PaymentMethod.CASH_ON_DELIVERY)
+                | Q(order__payment_status__in=[
+                    Order.PaymentStatus.PAID, Order.PaymentStatus.REFUND_PENDING, Order.PaymentStatus.REFUNDED,
+                ])
+            )
+            .select_related("order__user", "delivery__rider__user")
             .prefetch_related(Prefetch("items", queryset=OrderItem.objects.select_related("product")))
         )
 

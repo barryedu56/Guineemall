@@ -6,13 +6,15 @@ from django.urls import include, path
 admin.site.site_header = "Administration GuinéeMall"
 admin.site.site_title = "GuinéeMall"
 
+API_APPS = [
+    "vendors", "catalog", "orders", "statuts", "notifications", "payments",
+    "wallet", "promotions", "delivery", "chat", "lives",
+]
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
-    path("api/", include("apps.vendors.urls")),
-    path("api/", include("apps.catalog.urls")),
-    path("api/", include("apps.orders.urls")),
-    path("api/", include("apps.statuts.urls")),
+    *[path("api/", include(f"apps.{app}.urls")) for app in API_APPS],
 ]
 
 if settings.DEBUG:

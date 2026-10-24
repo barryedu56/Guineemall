@@ -5,6 +5,7 @@ Toutes les valeurs sensibles ou dépendantes de l'environnement sont lues
 depuis le fichier .env (voir .env.example).
 """
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -46,6 +47,12 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.chat",
     "apps.statuts",
+    "apps.notifications",
+    "apps.wallet",
+    "apps.payments",
+    "apps.promotions",
+    "apps.delivery",
+    "apps.lives",
 ]
 
 MIDDLEWARE = [
@@ -148,3 +155,59 @@ CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 
 # Statuts : durée de vie en heures
 STATUT_DURATION_HOURS = 24
+
+# Tâches en arrière-plan (Celery + Redis)
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = None
+# Pendant les tests, les tâches s'exécutent immédiatement (pas besoin de worker)
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default="test" in sys.argv)
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULE = {
+    "annuler-commandes-non-payees": {"task": "apps.payments.tasks.expire_unpaid_orders", "schedule": 300},
+    "liberer-paiements-sequestre": {"task": "apps.wallet.tasks.release_escrow", "schedule": 3600},
+    "supprimer-medias-statuts-expires": {"task": "apps.statuts.tasks.purge_expired_statuts", "schedule": 86400},
+}
+
+# URL publique du site (liens dans les notifications, retours de paiement)
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+BACKEND_URL = env("BACKEND_URL", default="http://localhost:8000")
+
+# Place de marché
+PLATFORM_COMMISSION_RATE = env.float("PLATFORM_COMMISSION_RATE", default=0.08)  # 8 % par vente
+AFFILIATE_COMMISSION_RATE = env.float("AFFILIATE_COMMISSION_RATE", default=0.02)  # 2 % pour l'ambassadeur
+ESCROW_AUTO_RELEASE_DAYS = 3  # paiement versé au vendeur si le client ne confirme pas la réception
+UNPAID_ORDER_TIMEOUT_MINUTES = 30
+REFERRAL_REWARD_GNF = 10_000
+
+# Paiements : "simulation" en développement, "live" avec les vraies clés
+PAYMENT_MODE = env("PAYMENT_MODE", default="simulation")
+ORANGE_MONEY = {
+    "CLIENT_ID": env("ORANGE_MONEY_CLIENT_ID", default=""),
+    "CLIENT_SECRET": env("ORANGE_MONEY_CLIENT_SECRET", default=""),
+    "MERCHANT_KEY": env("ORANGE_MONEY_MERCHANT_KEY", default=""),
+    "API_URL": env("ORANGE_MONEY_API_URL", default="https://api.orange.com"),
+    "COUNTRY": env("ORANGE_MONEY_COUNTRY", default="gn"),
+    "CURRENCY": env("ORANGE_MONEY_CURRENCY", default="GNF"),
+}
+MTN_MOMO = {
+    "API_URL": env("MTN_MOMO_API_URL", default="https://sandbox.momodeveloper.mtn.com"),
+    "SUBSCRIPTION_KEY": env("MTN_MOMO_SUBSCRIPTION_KEY", default=""),
+    "API_USER": env("MTN_MOMO_API_USER", default=""),
+    "API_KEY": env("MTN_MOMO_API_KEY", default=""),
+    "TARGET_ENVIRONMENT": env("MTN_MOMO_TARGET_ENVIRONMENT", default="sandbox"),
+    "CURRENCY": env("MTN_MOMO_CURRENCY", default="GNF"),
+}
+STRIPE = {
+    "SECRET_KEY": env("STRIPE_SECRET_KEY", default=""),
+    "WEBHOOK_SECRET": env("STRIPE_WEBHOOK_SECRET", default=""),
+}
+# Taux indicatifs pour la diaspora (1 EUR / 1 USD en GNF), à mettre à jour par l'admin
+EXCHANGE_RATES = {"EUR": env.int("RATE_EUR_GNF", default=9400), "USD": env.int("RATE_USD_GNF", default=8600)}
+
+# Notifications WhatsApp (API WhatsApp Cloud de Meta). Vide = messages affichés dans la console.
+WHATSAPP = {
+    "TOKEN": env("WHATSAPP_TOKEN", default=""),
+    "PHONE_NUMBER_ID": env("WHATSAPP_PHONE_NUMBER_ID", default=""),
+    "TEMPLATE": env("WHATSAPP_TEMPLATE", default="guineemall_notification"),
+    "LANGUAGE": "fr",
+}

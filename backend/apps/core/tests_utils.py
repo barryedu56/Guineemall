@@ -1,15 +1,33 @@
+from io import BytesIO
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from PIL import Image
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Address, User
 from apps.catalog.models import Category, Product
+from apps.delivery.models import DeliveryZone
 from apps.vendors.models import Vendor
+
+DELIVERY_FEE = 20_000
+
+
+def image_file(name="photo.png"):
+    """Vraie petite image PNG pour les champs ImageField."""
+    buffer = BytesIO()
+    Image.new("RGB", (4, 4), "orange").save(buffer, format="PNG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
 
 class GuineeMallTestCase(APITestCase):
     """Fabriques de données communes aux tests de l'API."""
 
+    @classmethod
+    def setUpTestData(cls):
+        DeliveryZone.objects.create(city="Conakry", commune="Ratoma", fee=DELIVERY_FEE)
+
     def make_client(self, email="client@test.gn"):
-        return User.objects.create_user(email=email, password="MotDePasse123!", name="Client Test")
+        return User.objects.create_user(email=email, password="MotDePasse123!", name="Client Test", phone="620000001")
 
     def make_vendor(self, shop_name="Boutique Kipé", status=Vendor.Status.APPROVED, email=None):
         email = email or f"{shop_name.lower().replace(' ', '')}@test.gn"

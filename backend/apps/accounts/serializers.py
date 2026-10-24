@@ -13,8 +13,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "name", "phone", "role", "avatar", "shop", "date_joined"]
-        read_only_fields = ["id", "email", "role", "date_joined"]
+        fields = ["id", "email", "name", "phone", "role", "avatar", "referral_code", "shop", "date_joined"]
+        read_only_fields = ["id", "email", "role", "referral_code", "date_joined"]
 
     def get_shop(self, user):
         vendor = getattr(user, "vendor", None)
@@ -25,14 +25,37 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
+    referral = serializers.CharField(write_only=True, required=False, allow_blank=True, max_length=12)
     tokens = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "email", "name", "phone", "password", "tokens"]
+        fields = ["id", "email", "name", "phone", "password", "referral", "tokens"]
+
+    def validate_referral(self, code):
+        if not code:
+            return None
+        parrain = User.objects.filter(referral_code=code.upper().strip()).first()
+        if parrain is None:
+            raise serializers.ValidationError("Code parrain inconnu.")
+        return parrain
 
     def create(self, validated_data):
-        return User.objects.create_user(role=User.Role.CLIENT, **validated_data)
+        return User.objects.create_user(role=User.Role.CLIENT, **self._with_referral(validated_data))
+
+    def _with_referral(self, validated_data):
+        parrain = validated_data.pop("referral", None)
+        if parrain:
+            validated_data["referred_by"] = parrain
+        return validated_data
+
+    def save(self, **kwargs):
+        user = super().save(**kwargs)
+        if user.referred_by_id:
+            from apps.promotions.services import create_referral_coupon
+
+            create_referral_coupon(user, f"Bienvenue de la part de {user.referred_by.name}")
+        return user
 
     def get_tokens(self, user):
         refresh = RefreshToken.for_user(user)
@@ -56,7 +79,7 @@ class VendorRegisterSerializer(RegisterSerializer):
             "description": validated_data.pop("shop_description", ""),
             "whatsapp": validated_data.pop("whatsapp", ""),
         }
-        user = User.objects.create_user(role=User.Role.VENDEUR, **validated_data)
+        user = User.objects.create_user(role=User.Role.VENDEUR, **self._with_referral(validated_data))
         Vendor.objects.create(user=user, **shop)
         return user
 

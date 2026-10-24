@@ -1,7 +1,17 @@
+import secrets
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+
+
+def generate_referral_code():
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sans 0/O ni 1/I, faciles à confondre
+    while True:
+        code = "".join(secrets.choice(alphabet) for _ in range(7))
+        if not User.objects.filter(referral_code=code).exists():
+            return code
 
 
 class UserManager(BaseUserManager):
@@ -35,6 +45,7 @@ class User(AbstractUser):
         ADMIN = "admin", "Administrateur"
         VENDEUR = "vendeur", "Vendeur"
         CLIENT = "client", "Client"
+        LIVREUR = "livreur", "Livreur"
 
     username = None
     first_name = None
@@ -45,6 +56,11 @@ class User(AbstractUser):
     phone = models.CharField("téléphone", max_length=20, blank=True)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.CLIENT)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
+    # Parrainage et affiliation : le même code sert aux deux
+    referral_code = models.CharField("code parrain", max_length=12, unique=True, blank=True)
+    referred_by = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="referrals"
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["name"]
@@ -56,6 +72,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
+
+    def save(self, *args, **kwargs):
+        if not self.referral_code:
+            self.referral_code = generate_referral_code()
+        super().save(*args, **kwargs)
 
     @property
     def is_vendeur(self):

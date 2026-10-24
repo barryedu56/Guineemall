@@ -24,6 +24,13 @@ class Vendor(TimeStampedModel, SoftDeleteModel):
     is_verified = models.BooleanField("vérifié", default=False)
     verified_at = models.DateTimeField(null=True, blank=True)
 
+    # Abonnement premium : commission réduite et mise en avant
+    is_premium = models.BooleanField("premium", default=False)
+    commission_rate = models.DecimalField(
+        "commission", max_digits=4, decimal_places=3, null=True, blank=True,
+        help_text="Vide = taux par défaut de la plateforme (ex. 0.080 pour 8 %)",
+    )
+
     class Meta:
         verbose_name = "vendeur"
         indexes = [models.Index(fields=["status"])]
@@ -39,3 +46,38 @@ class Vendor(TimeStampedModel, SoftDeleteModel):
     @property
     def is_approved(self):
         return self.status == self.Status.APPROVED
+
+    @property
+    def effective_commission_rate(self):
+        return float(self.commission_rate) if self.commission_rate is not None else settings.PLATFORM_COMMISSION_RATE
+
+
+class VerificationRequest(TimeStampedModel):
+    """Demande du badge « Vendeur vérifié » : pièce d'identité contrôlée par un admin."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente"
+        APPROVED = "approved", "Acceptée"
+        REJECTED = "rejected", "Refusée"
+
+    class DocumentType(models.TextChoices):
+        ID_CARD = "id_card", "Carte d'identité"
+        PASSPORT = "passport", "Passeport"
+        RCCM = "rccm", "Registre du commerce (RCCM)"
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="verification_requests")
+    document_type = models.CharField(max_length=10, choices=DocumentType.choices)
+    document_number = models.CharField("numéro du document", max_length=50)
+    document_front = models.ImageField("recto", upload_to="verifications/")
+    document_back = models.ImageField("verso", upload_to="verifications/", blank=True)
+    shop_photo = models.ImageField("photo de la boutique", upload_to="verifications/", blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    admin_note = models.CharField("motif", max_length=255, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "demande de vérification"
+        ordering = ["-created_at"]
