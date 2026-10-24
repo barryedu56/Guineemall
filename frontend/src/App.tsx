@@ -1,7 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import Layout from './components/Layout'
-import RequireAuth from './components/RequireAuth'
+import RequireAuth, { GuestOnly } from './components/RequireAuth'
 import { AccountPage, FavoritesPage } from './pages/AccountPages'
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VendorRegisterPage } from './pages/AuthPages'
 import CartPage from './pages/CartPage'
@@ -39,12 +39,12 @@ export default function App() {
           <Route path="/lives" element={<LivesPage />} />
           <Route path="/lives/:id" element={<LivePage />} />
           <Route path="/panier" element={<CartPage />} />
-          <Route path="/connexion" element={<LoginPage />} />
-          <Route path="/inscription" element={<RegisterPage />} />
-          <Route path="/mot-de-passe/oublie" element={<ForgotPasswordPage />} />
-          <Route path="/mot-de-passe/nouveau" element={<ResetPasswordPage />} />
-          <Route path="/devenir-vendeur" element={<VendorRegisterPage />} />
-          <Route path="/devenir-livreur" element={<RiderRegisterPage />} />
+          <Route path="/connexion" element={<GuestOnly><LoginPage /></GuestOnly>} />
+          <Route path="/inscription" element={<GuestOnly><RegisterPage /></GuestOnly>} />
+          <Route path="/mot-de-passe/oublie" element={<GuestOnly><ForgotPasswordPage /></GuestOnly>} />
+          <Route path="/mot-de-passe/nouveau" element={<GuestOnly><ResetPasswordPage /></GuestOnly>} />
+          <Route path="/devenir-vendeur" element={<GuestOnly><VendorRegisterPage /></GuestOnly>} />
+          <Route path="/devenir-livreur" element={<GuestOnly><RiderRegisterPage /></GuestOnly>} />
 
           <Route path="/commande" element={<RequireAuth><CheckoutPage /></RequireAuth>} />
           <Route path="/paiement/simulation/:reference" element={<RequireAuth><PaymentSimulationPage /></RequireAuth>} />

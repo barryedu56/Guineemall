@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { CheckCircle2, KeyRound, ShieldCheck, Smartphone, Store, Truck } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { Logo } from '../components/Layout'
 import { Button, ErrorBox, Input, Textarea } from '../components/ui'
@@ -9,17 +9,6 @@ import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
 import { api, errorMessage } from '../lib/api'
 import { affiliateCode } from '../lib/prefs'
-import type { User } from '../lib/types'
-
-function useRedirectAfterAuth() {
-  const navigate = useNavigate()
-  const [params] = useSearchParams()
-  return (user: User) => {
-    const next = params.get('suivant')
-    const home = { vendeur: '/vendeur', livreur: '/livreur', admin: '/', client: '/' }[user.role]
-    navigate(next ?? home, { replace: true })
-  }
-}
 
 /** Mise en page des écrans de compte : formulaire à gauche, arguments de la marque à droite. */
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
@@ -82,10 +71,12 @@ function useSubmit(action: () => Promise<void>) {
 
 export function LoginPage() {
   const { login } = useAuth()
-  const redirect = useRedirectAfterAuth()
   const [params] = useSearchParams()
   const [form, set] = useFormState({ email: '', password: '' })
-  const { submit, error, loading } = useSubmit(async () => redirect(await login(form.email, form.password)))
+  // La redirection est faite par <GuestOnly> dès que l'utilisateur est connecté
+  const { submit, error, loading } = useSubmit(async () => {
+    await login(form.email, form.password)
+  })
 
   return (
     <AuthLayout title="Bon retour 👋" subtitle="Connectez-vous pour commander, suivre vos colis et discuter avec les boutiques.">
@@ -108,11 +99,12 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const { register } = useAuth()
-  const redirect = useRedirectAfterAuth()
   const { data: config } = useSiteConfig()
   // Code parrain pré-rempli si le visiteur est arrivé par un lien ?ref=CODE
   const [form, set] = useFormState({ name: '', email: '', phone: '', password: '', referral: affiliateCode() })
-  const { submit, error, loading } = useSubmit(async () => redirect(await register(form)))
+  const { submit, error, loading } = useSubmit(async () => {
+    await register(form)
+  })
 
   return (
     <AuthLayout title="Créer un compte" subtitle="Quelques secondes suffisent.">
@@ -144,12 +136,10 @@ export function RegisterPage() {
 
 export function VendorRegisterPage() {
   const { registerVendor } = useAuth()
-  const navigate = useNavigate()
   const { data: config } = useSiteConfig()
   const [form, set] = useFormState({ name: '', email: '', phone: '', password: '', shop_name: '', shop_description: '', whatsapp: '' })
   const { submit, error, loading } = useSubmit(async () => {
     await registerVendor(form)
-    navigate('/vendeur', { replace: true })
   })
 
   return (

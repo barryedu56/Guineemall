@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Banknote, Bike, Clock, MapPin, Phone, Store, Wallet } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 import Price from '../components/Price'
 import { Button, Empty, ErrorBox, Input, Spinner, StatusBadge } from '../components/ui'
@@ -13,7 +13,6 @@ import type { RiderDelivery, RiderProfile } from '../lib/types'
 export function RiderRegisterPage() {
   const { registerRider } = useAuth()
   const { data: config } = useSiteConfig()
-  const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', city: 'Conakry', communes: '', vehicle_plate: '' })
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -24,8 +23,7 @@ export function RiderRegisterPage() {
     setError(null)
     setLoading(true)
     try {
-      await registerRider(form)
-      navigate('/livreur', { replace: true })
+      await registerRider(form) // <GuestOnly> redirige vers /livreur
     } catch (err) {
       setError(errorMessage(err))
     } finally {
