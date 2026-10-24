@@ -5,11 +5,11 @@ import { Navigate, useNavigate } from 'react-router-dom'
 
 import AddressForm from '../components/AddressForm'
 import Price from '../components/Price'
-import { Button, ErrorBox, Input, Spinner } from '../components/ui'
+import { Button, ErrorBox, Input, PhoneInput, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
 import { useSiteConfig } from '../context/settings'
-import { api, errorMessage } from '../lib/api'
+import { api, errorMessage, formatPhone } from '../lib/api'
 import { startPayment } from '../lib/payment'
 import { affiliateCode } from '../lib/prefs'
 import type { Address, Order, PaymentMethod, PickupPoint, Quote } from '../lib/types'
@@ -131,7 +131,7 @@ export default function CheckoutPage() {
                     <span>
                       <span className="font-medium">{a.label} · {a.quartier}, {a.commune || a.city}</span>
                       <span className="block text-sm text-ink/60">{a.landmark}</span>
-                      <span className="block text-sm text-ink/60">{a.contact_phone}</span>
+                      <span className="block text-sm text-ink/60">{formatPhone(a.contact_phone)}</span>
                     </span>
                   </label>
                 ))}
@@ -159,7 +159,7 @@ export default function CheckoutPage() {
                       {p.name} <Price amount={p.fee} className="text-sm" />
                     </span>
                     <span className="block text-sm text-ink/60">{p.address}, {p.commune}</span>
-                    <span className="block text-sm text-ink/60">{p.opening_hours} · {p.phone}</span>
+                    <span className="block text-sm text-ink/60">{p.opening_hours} · {formatPhone(p.phone)}</span>
                   </span>
                 </label>
               ))}
@@ -198,7 +198,7 @@ export default function CheckoutPage() {
           </div>
           {payment === 'mtn_momo' && (
             <div className="mt-3">
-              <Input label="Numéro MTN qui paie" type="tel" value={payerPhone} onChange={(e) => setPayerPhone(e.target.value)} placeholder="66X XX XX XX" required />
+              <PhoneInput label="Numéro MTN qui paie" value={payerPhone} onValueChange={setPayerPhone} required />
             </div>
           )}
           {payment !== 'cash_on_delivery' && (

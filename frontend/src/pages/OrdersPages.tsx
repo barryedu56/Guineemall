@@ -4,11 +4,11 @@ import { useEffect, useEffectEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import Price from '../components/Price'
-import { Button, Empty, ErrorBox, Input, PageHeader, Pager, Spinner, StatusBadge } from '../components/ui'
+import { Button, Empty, ErrorBox, PageHeader, Pager, PhoneInput, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useRealtime } from '../context/realtime'
 import { useSiteConfig } from '../context/settings'
-import { api, errorMessage, formatDate } from '../lib/api'
+import { api, errorMessage, formatDate, formatPhone } from '../lib/api'
 import { startPayment } from '../lib/payment'
 import type { Order, Paginated } from '../lib/types'
 
@@ -162,7 +162,7 @@ export function OrderDetailPage() {
             {config ? ` – la commande sera annulée si elle n'est pas payée sous ${config.unpaid_timeout_minutes} minutes.` : '.'}
           </p>
           {order.payment_method === 'mtn_momo' && (
-            <Input label="Numéro MTN qui paie" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <PhoneInput label="Numéro MTN qui paie" value={phone} onValueChange={setPhone} />
           )}
           <Button loading={action.isPending && action.variables === 'pay'} onClick={() => action.mutate('pay')}>
             Payer <Price amount={order.total_amount} />
@@ -228,7 +228,7 @@ export function OrderDetailPage() {
           {order.delivery_name && <p className="font-medium">Pour : {order.delivery_name}</p>}
           <p>{order.pickup_point_name ?? `${order.delivery_quartier}, ${order.delivery_commune || order.delivery_city}`}</p>
           <p className="text-sm text-ink/70">{order.delivery_landmark}</p>
-          <p className="text-sm text-ink/70">{order.delivery_phone}</p>
+          <p className="text-sm text-ink/70">{formatPhone(order.delivery_phone)}</p>
         </div>
         <dl className="space-y-1 text-sm">
           <h2 className="mb-1 font-semibold text-ink/60">Paiement · {order.payment_method_label}</h2>

@@ -3,6 +3,7 @@ import uuid
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+from apps.core.phone import PhoneField
 
 
 class Payment(TimeStampedModel):
@@ -24,7 +25,7 @@ class Payment(TimeStampedModel):
     reference = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     amount = models.PositiveBigIntegerField("montant (GNF)")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
-    payer_phone = models.CharField(max_length=20, blank=True)
+    payer_phone = PhoneField("numéro qui paie", blank=True)
     # Données renvoyées par l'opérateur
     provider_reference = models.CharField(max_length=150, blank=True)
     pay_token = models.CharField(max_length=255, blank=True)

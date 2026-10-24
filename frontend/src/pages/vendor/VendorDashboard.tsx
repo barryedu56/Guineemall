@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 
 import Price from '../../components/Price'
 import { Spinner } from '../../components/ui'
-import { api } from '../../lib/api'
+import { api, formatNumber } from '../../lib/api'
 import type { Paginated, VendorSideOrder, VendorStats, VendorStatut } from '../../lib/types'
 import { useMyShop } from './useMyShop'
 
@@ -63,7 +63,7 @@ export default function VendorDashboard() {
                 {stats.top_products.map((p) => (
                   <tr key={p.product_name}>
                     <td className="py-2">{p.product_name}</td>
-                    <td className="py-2 text-right tabular-nums">{p.sold}</td>
+                    <td className="py-2 text-right tabular-nums">{formatNumber(p.sold)}</td>
                     <td className="py-2 text-right tabular-nums"><Price amount={p.revenue} /></td>
                   </tr>
                 ))}
@@ -116,7 +116,7 @@ function Tile({ icon, label, value, sub, to }: { icon: ReactNode; label: string;
   const body = (
     <>
       <span className="text-primary-dark [&>svg]:size-5">{icon}</span>
-      <p className="mt-2 text-2xl font-extrabold tabular-nums">{value}</p>
+      <p className="mt-2 text-2xl font-extrabold tabular-nums">{typeof value === 'number' ? formatNumber(value) : value}</p>
       <p className="text-sm text-ink/60">{label}</p>
       {sub && <p className="text-xs text-ink/50">{sub}</p>}
     </>

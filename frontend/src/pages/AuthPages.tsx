@@ -4,11 +4,11 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
 import { Logo } from '../components/Layout'
-import { Button, ErrorBox, Input, Textarea } from '../components/ui'
+import { Button, ErrorBox, Input, PhoneInput, Textarea } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
 import { useToast } from '../context/toast'
-import { api, errorMessage } from '../lib/api'
+import { api, errorMessage, formatGNF } from '../lib/api'
 import { affiliateCode } from '../lib/prefs'
 
 /** Mise en page des écrans de compte : formulaire à gauche, arguments de la marque à droite. */
@@ -48,7 +48,8 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
 function useFormState<T extends Record<string, string>>(initial: T) {
   const [form, setForm] = useState(initial)
   const set = (key: keyof T) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
-  return [form, set] as const
+  const setValue = (key: keyof T, value: string) => setForm({ ...form, [key]: value })
+  return [form, set, setValue] as const
 }
 
 function useSubmit(action: () => Promise<void>) {
@@ -104,7 +105,7 @@ export function RegisterPage() {
   const { register } = useAuth()
   const { data: config } = useSiteConfig()
   // Code parrain pré-rempli si le visiteur est arrivé par un lien ?ref=CODE
-  const [form, set] = useFormState({ name: '', email: '', phone: '', password: '', referral: affiliateCode() })
+  const [form, set, setValue] = useFormState({ name: '', email: '', phone: '', password: '', referral: affiliateCode() })
   const toast = useToast()
   const { submit, error, loading } = useSubmit(async () => {
     const user = await register(form)
@@ -117,14 +118,14 @@ export function RegisterPage() {
         <Input label="Nom complet" value={form.name} onChange={set('name')} required autoComplete="name" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
-          <Input label="Téléphone" type="tel" value={form.phone} onChange={set('phone')} placeholder="620 00 00 00" autoComplete="tel" />
+          <PhoneInput label="Téléphone" value={form.phone} onValueChange={(v) => setValue('phone', v)} />
         </div>
         <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required minLength={8} autoComplete="new-password" hint="8 caractères minimum" />
         <Input
           label="Code parrain (facultatif)"
           value={form.referral}
           onChange={set('referral')}
-          hint={config ? `Un ami vous a invité ? Vous recevez un bon de ${new Intl.NumberFormat('fr-FR').format(config.referral_reward)} GNF.` : undefined}
+          hint={config ? `Un ami vous a invité ? Vous recevez un bon de ${formatGNF(config.referral_reward)}.` : undefined}
         />
         <ErrorBox message={error} />
         <Button type="submit" size="lg" loading={loading} className="w-full">Créer mon compte</Button>
@@ -142,7 +143,7 @@ export function RegisterPage() {
 export function VendorRegisterPage() {
   const { registerVendor } = useAuth()
   const { data: config } = useSiteConfig()
-  const [form, set] = useFormState({ name: '', email: '', phone: '', password: '', shop_name: '', shop_description: '', whatsapp: '' })
+  const [form, set, setValue] = useFormState({ name: '', email: '', phone: '', password: '', shop_name: '', shop_description: '', whatsapp: '' })
   const toast = useToast()
   const { submit, error, loading } = useSubmit(async () => {
     await registerVendor(form)
@@ -158,12 +159,12 @@ export function VendorRegisterPage() {
         <p className="text-xs font-bold uppercase tracking-wider text-ink/45">Votre boutique</p>
         <Input label="Nom de la boutique" value={form.shop_name} onChange={set('shop_name')} required />
         <Textarea label="Description" value={form.shop_description} onChange={set('shop_description')} placeholder="Ce que vous vendez, où vous êtes…" />
-        <Input label="Numéro WhatsApp" type="tel" value={form.whatsapp} onChange={set('whatsapp')} placeholder="620 00 00 00" hint="Les clients pourront vous écrire directement." />
+        <PhoneInput label="Numéro WhatsApp" value={form.whatsapp} onValueChange={(v) => setValue('whatsapp', v)} hint="Les clients pourront vous écrire directement." />
         <p className="pt-2 text-xs font-bold uppercase tracking-wider text-ink/45">Vous</p>
         <Input label="Nom complet" value={form.name} onChange={set('name')} required />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
-          <Input label="Téléphone" type="tel" value={form.phone} onChange={set('phone')} />
+          <PhoneInput label="Téléphone" value={form.phone} onValueChange={(v) => setValue('phone', v)} />
         </div>
         <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required minLength={8} hint="8 caractères minimum" />
         <ErrorBox message={error} />

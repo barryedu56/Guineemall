@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 
 import Price from '../../components/Price'
 import Stars from '../../components/Stars'
-import { Badge, Button, Empty, ErrorBox, Input, Select, Spinner, Textarea } from '../../components/ui'
+import { AmountInput, Badge, Button, Empty, ErrorBox, Input, Select, Spinner, Textarea } from '../../components/ui'
 import { useSiteConfig } from '../../context/settings'
 import { api, errorMessage, formatDate } from '../../lib/api'
 import { fetchAll } from '../../lib/queries'
@@ -56,9 +56,13 @@ export function VendorCouponsPage() {
           <Select label="Type" value={form.type} onChange={set('type')}>
             {config?.choices.coupon_type.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </Select>
-          <Input label={form.type === 'percent' ? 'Réduction (%)' : 'Réduction (GNF)'} type="number" min={1} value={form.value} onChange={set('value')} required />
+          {form.type === 'percent' ? (
+            <Input label="Réduction (%)" type="number" min={1} max={90} value={form.value} onChange={set('value')} required />
+          ) : (
+            <AmountInput label="Réduction (GNF)" value={form.value} onValueChange={(value) => setForm({ ...form, value })} required />
+          )}
         </div>
-        <Input label="Achat minimum (GNF)" type="number" min={0} value={form.min_amount} onChange={set('min_amount')} />
+        <AmountInput label="Achat minimum (GNF)" value={form.min_amount} onValueChange={(min_amount) => setForm({ ...form, min_amount })} />
         <div className="grid grid-cols-2 gap-3">
           <Input label="Utilisations max" type="number" min={1} value={form.usage_limit} onChange={set('usage_limit')} hint="Vide = illimité" />
           <Input label="Fin" type="date" value={form.ends_at} onChange={set('ends_at')} />

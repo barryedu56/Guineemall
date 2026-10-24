@@ -35,7 +35,7 @@ def find_valid_coupon(code, user, lines):
     if eligible == 0:
         raise CouponError("Ce code promo ne s'applique à aucun article de votre panier.")
     if eligible < coupon.min_amount:
-        raise CouponError(f"Ce code promo nécessite un minimum de {coupon.min_amount:,} GNF d'achat.".replace(",", " "))
+        raise CouponError(f"Ce code promo nécessite un minimum de {gnf(coupon.min_amount)} d'achat.")
     return coupon, eligible
 
 

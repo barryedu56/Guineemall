@@ -8,7 +8,7 @@ import Price from '../components/Price'
 import { PageHeader, Skeleton, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useToast } from '../context/toast'
-import { api, errorMessage, formatDate } from '../lib/api'
+import { api, errorMessage, formatDate, formatNumber } from '../lib/api'
 
 interface Dashboard {
   today: { orders: number; revenue: number }
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
               <button key={path} onClick={() => openAdmin(path)} className="card card-hover flex items-center gap-4 p-5 text-left">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-ink"><Icon className="size-6" /></span>
                 <span>
-                  <span className="block text-2xl font-extrabold">{count}</span>
+                  <span className="block text-2xl font-extrabold">{formatNumber(count)}</span>
                   <span className="text-sm text-ink/60">{label}{amount ? <> · <Price amount={amount} /></> : null}</span>
                 </span>
               </button>
@@ -155,7 +155,7 @@ function Tile({ icon, label, value, sub }: { icon: ReactNode; label: string; val
   return (
     <div className="card p-5">
       <span className="text-primary-dark [&>svg]:size-5">{icon}</span>
-      <p className="mt-2 text-2xl font-extrabold tabular-nums">{value}</p>
+      <p className="mt-2 text-2xl font-extrabold tabular-nums">{typeof value === 'number' ? formatNumber(value) : value}</p>
       <p className="text-sm font-medium">{label}</p>
       {sub && <p className="text-xs text-ink/55">{sub}</p>}
     </div>

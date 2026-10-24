@@ -5,6 +5,8 @@ from io import BytesIO
 from django.core.cache import cache
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from apps.core.formatting import gnf
+
 SIZE = 1080
 YELLOW = (255, 193, 7)
 INK = (33, 37, 41)
@@ -54,7 +56,7 @@ def build_share_image(product):
     for line in _wrap(draw, product.name, _font(46), SIZE - 80):
         draw.text((40, y), line, fill="white", font=_font(46))
         y += 56
-    price = f"{product.price:,} GNF".replace(",", " ")
+    price = gnf(product.price)
     draw.text((40, SIZE - 95), price, fill=YELLOW, font=_font(60))
     brand = "GuinéeMall"
     w = draw.textlength(brand, font=_font(38))

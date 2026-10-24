@@ -1,7 +1,9 @@
 from django.conf import settings
 from django.db import models
 
+from apps.core.formatting import gnf
 from apps.core.models import TimeStampedModel
+from apps.core.phone import PhoneField
 
 
 class DeliveryZone(models.Model):
@@ -19,7 +21,7 @@ class DeliveryZone(models.Model):
         constraints = [models.UniqueConstraint(fields=["city", "commune"], name="unique_delivery_zone")]
 
     def __str__(self):
-        return f"{self.commune or 'Toute la ville'}, {self.city} : {self.fee} GNF"
+        return f"{self.commune or 'Toute la ville'}, {self.city} : {gnf(self.fee)}"
 
     @classmethod
     def find(cls, city, commune=""):
@@ -39,7 +41,7 @@ class PickupPoint(models.Model):
     city = models.CharField("ville", max_length=100)
     commune = models.CharField(max_length=100, blank=True)
     address = models.TextField("adresse / repère")
-    phone = models.CharField("téléphone", max_length=20)
+    phone = PhoneField("téléphone")
     opening_hours = models.CharField("horaires", max_length=100, default="Lun-Sam, 8 h - 19 h")
     fee = models.PositiveIntegerField("frais (GNF)", default=0)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

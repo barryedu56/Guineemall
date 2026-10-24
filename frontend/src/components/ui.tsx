@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { formatNumber } from '../lib/api'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 type Variant = 'primary' | 'dark' | 'outline' | 'ghost' | 'danger'
@@ -56,6 +57,82 @@ export function Input({ label, hint, ...props }: InputHTMLAttributes<HTMLInputEl
   return (
     <Field label={label} hint={hint}>
       <input className={fieldClass} {...props} />
+    </Field>
+  )
+}
+
+const PHONE_DIGITS = 9
+
+/**
+ * Garde les 9 chiffres du numéro local et retire l'indicatif (+224, 00224), qu'il soit collé ou tapé.
+ * Un numéro guinéen local commence par 6 (mobile) ou 3 (fixe), jamais par 224 : ce préfixe est donc l'indicatif.
+ */
+function localDigits(raw: string) {
+  let d = raw.replace(/\D/g, '')
+  if (d.startsWith('00224')) d = d.slice(5)
+  else if (d.startsWith('224')) d = d.slice(3)
+  return d.slice(0, PHONE_DIGITS)
+}
+
+/** Téléphone guinéen : chiffres uniquement, 9 maximum, affiché « 620 11 22 33 ». La valeur transmise est « 620112233 ». */
+export function PhoneInput({
+  label,
+  hint,
+  value,
+  onValueChange,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+  label: string
+  hint?: string
+  value: string
+  onValueChange: (digits: string) => void
+}) {
+  const digits = value.replace(/\D/g, '').slice(0, PHONE_DIGITS)
+  const shown = [digits.slice(0, 3), digits.slice(3, 5), digits.slice(5, 7), digits.slice(7, 9)].filter(Boolean).join(' ')
+  const incomplete = digits.length > 0 && digits.length < PHONE_DIGITS
+  return (
+    <Field label={label} hint={incomplete ? `Encore ${PHONE_DIGITS - digits.length} chiffre(s) — 9 chiffres au total` : hint ?? '9 chiffres, ex. 620 11 22 33'}>
+      <input
+        {...props}
+        className={fieldClass}
+        type="tel"
+        inputMode="numeric"
+        autoComplete="tel-national"
+        placeholder="620 11 22 33"
+        value={shown}
+        maxLength={12}
+        pattern="\d{3} \d{2} \d{2} \d{2}"
+        title="9 chiffres, ex. 620 11 22 33"
+        onChange={(e) => onValueChange(localDigits(e.target.value))}
+      />
+    </Field>
+  )
+}
+
+/** Montant en GNF : affiché « 1 850 000 » pendant la saisie, transmis « 1850000 ». */
+export function AmountInput({
+  label,
+  hint,
+  value,
+  onValueChange,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+  label: string
+  hint?: string
+  value: string
+  onValueChange: (digits: string) => void
+}) {
+  const digits = value.replace(/\D/g, '')
+  return (
+    <Field label={label} hint={hint}>
+      <input
+        {...props}
+        className={fieldClass}
+        type="text"
+        inputMode="numeric"
+        value={digits ? formatNumber(Number(digits)) : ''}
+        onChange={(e) => onValueChange(e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, ''))}
+      />
     </Field>
   )
 }

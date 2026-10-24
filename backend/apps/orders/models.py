@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import SoftDeleteModel, TimeStampedModel
+from apps.core.phone import PhoneField
 
 
 class CartItem(TimeStampedModel):
@@ -95,7 +96,7 @@ class Order(TimeStampedModel, SoftDeleteModel):
     delivery_landmark = models.TextField()
     delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    delivery_phone = models.CharField(max_length=20)
+    delivery_phone = PhoneField("téléphone de livraison")
 
     class Meta:
         verbose_name = "commande"

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import Address
+from apps.core.phone import PhoneSerializerField
 from apps.delivery.models import PickupPoint
 from apps.catalog.models import Product
 from apps.catalog.serializers import ProductListSerializer
@@ -63,7 +64,7 @@ class CheckoutSerializer(QuoteSerializer):
 
 
 class PaySerializer(serializers.Serializer):
-    phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    phone = PhoneSerializerField(required=False, allow_blank=True)
 
 
 class OrderItemSerializer(serializers.ModelSerializer):

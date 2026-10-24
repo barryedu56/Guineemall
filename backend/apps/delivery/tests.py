@@ -33,7 +33,7 @@ class DeliveryTests(OrderTestCase):
 
     def test_livreur_non_valide_refuse(self):
         r = self.client.post("/api/auth/register/rider/", {
-            "email": "moto@test.gn", "name": "Moto", "password": "MotDePasse123!", "phone": "620",
+            "email": "moto@test.gn", "name": "Moto", "password": "MotDePasse123!", "phone": "620 45 67 89",
         })
         self.assertEqual(r.status_code, 201, r.data)
         self.client.force_authenticate(User.objects.get(email="moto@test.gn"))

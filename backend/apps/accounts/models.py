@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+from apps.core.phone import PhoneField
 
 
 def generate_referral_code():
@@ -53,7 +54,7 @@ class User(AbstractUser):
 
     name = models.CharField("nom complet", max_length=255)
     email = models.EmailField("email", unique=True)
-    phone = models.CharField("téléphone", max_length=20, blank=True)
+    phone = PhoneField("téléphone", blank=True)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.CLIENT)
     avatar = models.ImageField(upload_to="avatars/", blank=True)
     # Parrainage et affiliation : le même code sert aux deux
@@ -106,7 +107,7 @@ class Address(TimeStampedModel):
     landmark = models.TextField("repère", help_text="Ex. : derrière la mosquée de Kipé, portail bleu")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    contact_phone = models.CharField("téléphone à appeler", max_length=20)
+    contact_phone = PhoneField("téléphone à appeler")
     is_default = models.BooleanField("par défaut", default=False)
 
     class Meta:

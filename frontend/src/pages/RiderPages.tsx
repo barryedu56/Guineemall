@@ -4,10 +4,10 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import Price from '../components/Price'
-import { Button, Empty, ErrorBox, Input, Spinner, StatusBadge } from '../components/ui'
+import { Button, Empty, ErrorBox, Input, PhoneInput, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
-import { api, errorMessage } from '../lib/api'
+import { api, errorMessage, formatPhone } from '../lib/api'
 import type { RiderDelivery, RiderProfile } from '../lib/types'
 
 export function RiderRegisterPage() {
@@ -38,7 +38,7 @@ export function RiderRegisterPage() {
       <p className="mb-6 mt-1 text-ink/70">Livrez à moto dans votre quartier et soyez payé à chaque course.</p>
       <form onSubmit={submit} className="space-y-4">
         <Input label="Nom complet" value={form.name} onChange={set('name')} required />
-        <Input label="Téléphone" type="tel" value={form.phone} onChange={set('phone')} required />
+        <PhoneInput label="Téléphone" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
         <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
         <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required minLength={8} />
         <Input label="Ville" value={form.city} onChange={set('city')} required />
@@ -207,7 +207,7 @@ function DeliveryCard({ delivery: d, children }: { delivery: RiderDelivery; chil
         <StatusBadge status={d.status === 'picked_up' ? 'processing' : d.status === 'open' ? 'pending' : 'confirmed'} label={d.status_label} />
       </div>
       <div className="grid gap-2 text-sm sm:grid-cols-2">
-        <p className="flex gap-2"><Store className="size-4 shrink-0 text-primary-dark" /> {d.pickup.shop_name} · <a href={`tel:${d.pickup.phone}`} className="text-primary-dark">{d.pickup.phone}</a></p>
+        <p className="flex gap-2"><Store className="size-4 shrink-0 text-primary-dark" /> {d.pickup.shop_name} · <a href={`tel:${d.pickup.phone}`} className="text-primary-dark">{formatPhone(d.pickup.phone)}</a></p>
         <p className="flex gap-2">
           <MapPin className="size-4 shrink-0 text-primary-dark" />
           <span>
@@ -217,7 +217,7 @@ function DeliveryCard({ delivery: d, children }: { delivery: RiderDelivery; chil
           </span>
         </p>
         {d.dropoff.phone && (
-          <a href={`tel:${d.dropoff.phone}`} className="flex gap-2 font-medium text-primary-dark"><Phone className="size-4" /> {d.dropoff.name} · {d.dropoff.phone}</a>
+          <a href={`tel:${d.dropoff.phone}`} className="flex gap-2 font-medium text-primary-dark"><Phone className="size-4" /> {d.dropoff.name} · {formatPhone(d.dropoff.phone)}</a>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-4 rounded-xl bg-background p-3 text-sm">

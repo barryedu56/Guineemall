@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { ImageOff, ImagePlus, Package, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
-import { Badge, Button, Empty, ErrorBox, Input, Pager, Select, Spinner, Textarea } from '../../components/ui'
+import { AmountInput, Badge, Button, Empty, ErrorBox, Input, Pager, Select, Spinner, Textarea } from '../../components/ui'
 import { api, errorMessage, formatGNF } from '../../lib/api'
 import { useCategories } from '../../lib/queries'
 import type { Paginated, VendorProduct } from '../../lib/types'
@@ -188,8 +188,8 @@ function ProductForm({ product, onDone }: { product: VendorProduct | null; onDon
       </Select>
       <Textarea label="Description" value={form.description} onChange={set('description')} required rows={5} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Input label="Prix (GNF)" type="number" min={0} value={form.price} onChange={set('price')} required />
-        <Input label="Ancien prix (GNF)" type="number" min={0} value={form.compare_at_price} onChange={set('compare_at_price')} hint="Optionnel, pour afficher une promo" />
+        <AmountInput label="Prix (GNF)" value={form.price} onValueChange={(price) => setForm({ ...form, price })} required />
+        <AmountInput label="Ancien prix (GNF)" value={form.compare_at_price} onValueChange={(compare_at_price) => setForm({ ...form, compare_at_price })} hint="Optionnel, pour afficher une promo" />
         <Input label="Stock" type="number" min={0} value={form.stock} onChange={set('stock')} required />
       </div>
       <fieldset className="space-y-2">

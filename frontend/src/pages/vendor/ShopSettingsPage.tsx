@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { ShopAvatar } from '../../components/Statuts'
-import { Button, ErrorBox, Input, Select, Textarea } from '../../components/ui'
+import { Button, ErrorBox, Input, PhoneInput, Select, Textarea } from '../../components/ui'
 import { useSiteConfig } from '../../context/settings'
 import { api, errorMessage, formatDate } from '../../lib/api'
 import type { MyShop } from '../../lib/types'
@@ -145,7 +145,7 @@ function ShopSettingsForm({ shop }: { shop: MyShop }) {
       </div>
       <Input label="Nom de la boutique" value={form.shop_name} onChange={(e) => setForm({ ...form, shop_name: e.target.value })} required />
       <Textarea label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-      <Input label="Numéro WhatsApp" type="tel" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} hint="Affiché sur vos produits avec le bouton « Commander via WhatsApp »." />
+      <PhoneInput label="Numéro WhatsApp" value={form.whatsapp} onValueChange={(whatsapp) => setForm({ ...form, whatsapp })} hint="Affiché sur vos produits avec le bouton « Commander via WhatsApp »." />
       <ErrorBox message={error} />
       <div className="flex flex-wrap items-center gap-4">
         <Button type="submit" loading={save.isPending}>

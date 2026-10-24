@@ -17,6 +17,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.formatting import gnf
 from apps.notifications.services import notify
 
 from .models import LedgerEntry, PayoutRequest
@@ -57,7 +58,7 @@ def release_funds(vendor_order):
         vendor_amount -= vendor_order.total_amount  # la boutique a encaissé le client
     _credit(
         vendor_order.vendor.user, LedgerEntry.Kind.SALE if not cash or rider else LedgerEntry.Kind.COD_COMMISSION,
-        vendor_amount, vendor_order, f"Commande #{order.id} (commission {commission} GNF)",
+        vendor_amount, vendor_order, f"Commande #{order.id} (commission {gnf(commission)})",
     )
 
     if rider:
@@ -68,13 +69,13 @@ def release_funds(vendor_order):
         affiliate_amount = round((vendor_order.subtotal - vendor_order.vendor_discount) * settings.AFFILIATE_COMMISSION_RATE)
         _credit(order.affiliate, LedgerEntry.Kind.AFFILIATE, affiliate_amount, vendor_order, f"Vente commande #{order.id}")
         notify(order.affiliate, "wallet", "Commission ambassadeur 🎉",
-               f"Vous avez gagné {affiliate_amount} GNF grâce à votre lien.", "/portefeuille", whatsapp=False)
+               f"Vous avez gagné {gnf(affiliate_amount)} grâce à votre lien.", "/portefeuille", whatsapp=False)
 
     vendor_order.funds_released_at = timezone.now()
     vendor_order.save(update_fields=["funds_released_at", "updated_at"])
     if not cash:
         notify(vendor_order.vendor.user, "wallet", "Paiement disponible",
-               f"{vendor_amount} GNF de la commande #{order.id} sont disponibles dans votre portefeuille.",
+               f"{gnf(vendor_amount)} de la commande #{order.id} sont disponibles dans votre portefeuille.",
                "/vendeur/portefeuille")
     return True
 
@@ -86,7 +87,7 @@ def request_payout(user, amount, method, phone):
     if amount <= 0:
         raise ValueError("Le montant doit être positif.")
     if amount > balance - pending:
-        raise ValueError(f"Solde disponible insuffisant ({max(0, balance - pending)} GNF).")
+        raise ValueError(f"Solde disponible insuffisant ({gnf(max(0, balance - pending))}).")
     return PayoutRequest.objects.create(user=user, amount=amount, method=method, phone=phone)
 
 
@@ -107,7 +108,7 @@ def process_payout(payout, admin, paid, reference="", note=""):
             note=f"Retrait {payout.get_method_display()} {payout.phone}",
         )
         notify(payout.user, "wallet", "Retrait effectué",
-               f"{payout.amount} GNF ont été envoyés sur votre compte {payout.get_method_display()}.", "/portefeuille")
+               f"{gnf(payout.amount)} ont été envoyés sur votre compte {payout.get_method_display()}.", "/portefeuille")
     else:
         notify(payout.user, "wallet", "Retrait refusé", note or "Contactez GuinéeMall pour plus d'informations.",
                "/portefeuille")

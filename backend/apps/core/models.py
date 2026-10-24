@@ -2,6 +2,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
+from .phone import PhoneField
+
 
 class TimeStampedModel(models.Model):
     """Ajoute created_at / updated_at (équivalent de $table->timestamps())."""
@@ -72,8 +74,8 @@ class SiteSettings(models.Model):
         default="Achetez auprès de boutiques de Conakry et de toute la Guinée. Payez par Orange Money, MTN ou à la livraison.",
     )
     hero_image = models.ImageField("image de l'accueil", upload_to="site/", blank=True)
-    contact_phone = models.CharField("téléphone", max_length=20, blank=True)
-    contact_whatsapp = models.CharField("WhatsApp du service client", max_length=20, blank=True)
+    contact_phone = PhoneField("téléphone", blank=True)
+    contact_whatsapp = PhoneField("WhatsApp du service client", blank=True)
     contact_email = models.EmailField("email", blank=True)
     address = models.CharField("adresse", max_length=200, blank=True, default="Conakry, Guinée")
     facebook_url = models.URLField(blank=True)

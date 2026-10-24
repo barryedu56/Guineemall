@@ -125,6 +125,8 @@ LANGUAGE_CODE = "fr"
 TIME_ZONE = "Africa/Conakry"
 USE_I18N = True
 USE_TZ = True
+# Nombres affichés « 1 000 000 » dans l'admin
+USE_THOUSAND_SEPARATOR = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

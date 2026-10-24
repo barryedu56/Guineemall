@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import SoftDeleteModel, TimeStampedModel, unique_slug
+from apps.core.phone import PhoneField
 
 
 class Vendor(TimeStampedModel, SoftDeleteModel):
@@ -18,7 +19,7 @@ class Vendor(TimeStampedModel, SoftDeleteModel):
     description = models.TextField(blank=True)
     logo = models.ImageField(upload_to="vendors/logos/", blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
-    whatsapp = models.CharField("numéro WhatsApp", max_length=20, blank=True)
+    whatsapp = PhoneField("numéro WhatsApp", blank=True)
 
     # Badge « Vendeur vérifié » : pièce d'identité + téléphone contrôlés par un admin
     is_verified = models.BooleanField("vérifié", default=False)

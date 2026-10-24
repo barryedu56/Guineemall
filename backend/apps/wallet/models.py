@@ -2,7 +2,9 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 
+from apps.core.formatting import gnf
 from apps.core.models import TimeStampedModel
+from apps.core.phone import PhoneField
 
 
 class LedgerEntry(models.Model):
@@ -62,7 +64,7 @@ class PayoutRequest(TimeStampedModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="payouts")
     amount = models.PositiveBigIntegerField("montant (GNF)")
     method = models.CharField(max_length=20, choices=Method.choices)
-    phone = models.CharField("numéro", max_length=20)
+    phone = PhoneField("numéro")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     transaction_reference = models.CharField("référence du transfert", max_length=100, blank=True)
     admin_note = models.CharField(max_length=255, blank=True)
@@ -76,4 +78,4 @@ class PayoutRequest(TimeStampedModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Retrait {self.amount} GNF – {self.user}"
+        return f"Retrait {gnf(self.amount)} – {self.user}"

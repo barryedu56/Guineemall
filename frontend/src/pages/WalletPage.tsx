@@ -3,10 +3,10 @@ import { Lock, Wallet as WalletIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import Price from '../components/Price'
-import { Badge, Button, ErrorBox, Input, Select, Spinner } from '../components/ui'
+import { AmountInput, Badge, Button, ErrorBox, PhoneInput, Select, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
-import { api, errorMessage, formatDate } from '../lib/api'
+import { api, errorMessage, formatDate, formatPhone } from '../lib/api'
 import type { Payout, Wallet } from '../lib/types'
 
 /** Portefeuille : vendeurs (ventes), ambassadeurs (commissions), livreurs (courses). */
@@ -69,11 +69,11 @@ export default function WalletPage() {
       <form onSubmit={submit} className="space-y-3 card p-6">
         <h2 className="text-lg font-semibold">Retirer mon argent</h2>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Input label="Montant (GNF)" type="number" min={1000} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <AmountInput label="Montant (GNF)" value={form.amount} onValueChange={(amount) => setForm({ ...form, amount })} required />
           <Select label="Vers" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
             {config?.choices.payout_method.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </Select>
-          <Input label="Numéro" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+          <PhoneInput label="Numéro" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
         </div>
         <ErrorBox message={error} />
         <Button type="submit" loading={withdraw.isPending} disabled={wallet.available <= 0}>Demander le retrait</Button>
@@ -86,7 +86,7 @@ export default function WalletPage() {
           <ul className="divide-y divide-ink/5 text-sm">
             {payouts.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 py-2">
-                <span>{formatDate(p.created_at)} · {config?.choices.payout_method.find((c) => c.value === p.method)?.label} {p.phone}</span>
+                <span>{formatDate(p.created_at)} · {config?.choices.payout_method.find((c) => c.value === p.method)?.label} {formatPhone(p.phone)}</span>
                 <span className="flex items-center gap-2">
                   <Price amount={p.amount} />
                   <Badge tone={p.status === 'paid' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}>{p.status_label}</Badge>

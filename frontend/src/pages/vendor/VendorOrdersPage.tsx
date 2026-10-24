@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Button, Empty, ErrorBox, Pager, Spinner, StatusBadge } from '../../components/ui'
 import { useSiteConfig } from '../../context/settings'
 import { useToast } from '../../context/toast'
-import { api, errorMessage, formatDate, formatGNF } from '../../lib/api'
+import { api, errorMessage, formatDate, formatGNF, formatPhone } from '../../lib/api'
 import type { Paginated, VendorOrderStatus, VendorSideOrder } from '../../lib/types'
 
 export default function VendorOrdersPage() {
@@ -142,7 +142,7 @@ function VendorOrderCard({
         <p className="flex items-center gap-2 text-sm font-medium text-primary-dark"><Store className="size-4" /> À déposer au point relais</p>
       )}
       {order.tracking && order.tracking.status !== 'open' && (
-        <p className="flex items-center gap-2 text-sm"><Bike className="size-4 text-primary-dark" /> {order.tracking.status_label} · {order.tracking.rider_name} {order.tracking.rider_phone}</p>
+        <p className="flex items-center gap-2 text-sm"><Bike className="size-4 text-primary-dark" /> {order.tracking.status_label} · {order.tracking.rider_name} {formatPhone(order.tracking.rider_phone)}</p>
       )}
 
       <div className="space-y-1 rounded-2xl bg-background p-4 text-sm">
@@ -159,7 +159,7 @@ function VendorOrderCard({
           </span>
         </p>
         <a href={`tel:${d.phone}`} className="flex items-center gap-2 font-medium text-primary-dark">
-          <Phone className="size-4" /> {d.phone}
+          <Phone className="size-4" /> {formatPhone(d.phone)}
         </a>
       </div>
 

@@ -89,3 +89,21 @@ class ConfigTests(GuineeMallTestCase):
         self.client.post("/api/cart/", {"product_slug": product.slug, "quantity": 1})
         r = self.client.post("/api/orders/", {"address": self.make_address(user).pk, "payment_method": "card"})
         self.assertEqual(r.status_code, 400)
+
+
+class PhoneTests(GuineeMallTestCase):
+    def test_numero_nettoye_et_limite_a_9_chiffres(self):
+        user = self.make_client()
+        self.client.force_authenticate(user)
+        for saisie in ["620 11 22 33", "+224 620-11-22-33", "00224620112233"]:
+            r = self.client.patch("/api/auth/me/", {"phone": saisie})
+            self.assertEqual((r.status_code, r.data["phone"]), (200, "620112233"), saisie)
+        for invalide in ["62011223", "6201122334", "abc"]:
+            r = self.client.patch("/api/auth/me/", {"phone": invalide})
+            self.assertEqual(r.status_code, 400, invalide)
+            self.assertIn("9 chiffres", str(r.data["phone"][0]))
+
+    def test_adresse_avec_numero_invalide_refusee(self):
+        self.client.force_authenticate(self.make_client())
+        r = self.client.post("/api/auth/addresses/", {"landmark": "Marché", "contact_phone": "62000000000"})
+        self.assertEqual(r.status_code, 400)

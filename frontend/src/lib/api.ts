@@ -56,9 +56,22 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
   }
 })
 
-/** Formate un montant en francs guinéens : 150000 → « 150 000 GNF » */
+const NBSP = '\u00a0'
+
+/** Nombre avec séparateur de milliers (espace insécable bien visible) : 1000 → « 1 000 » */
+export function formatNumber(value: number) {
+  return Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, NBSP)
+}
+
+/** Montant en francs guinéens : 150000 → « 150 000 GNF » */
 export function formatGNF(amount: number) {
-  return `${new Intl.NumberFormat('fr-FR').format(amount)} GNF`
+  return `${formatNumber(amount)}${NBSP}GNF`
+}
+
+/** Téléphone guinéen à 9 chiffres : 620112233 → « 620 11 22 33 » */
+export function formatPhone(phone: string | null | undefined) {
+  const d = (phone ?? '').replace(/\D/g, '')
+  return d.length === 9 ? `${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5, 7)} ${d.slice(7)}` : (phone ?? '')
 }
 
 /** Extrait un message lisible d'une erreur de l'API Django REST Framework. */

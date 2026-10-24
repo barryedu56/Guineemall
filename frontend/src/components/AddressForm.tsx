@@ -5,7 +5,7 @@ import { useState, type FormEvent } from 'react'
 import { useSiteConfig } from '../context/settings'
 import { api, errorMessage } from '../lib/api'
 import type { Address } from '../lib/types'
-import { Button, ErrorBox, Input, Select, Textarea } from './ui'
+import { Button, ErrorBox, Input, PhoneInput, Select, Textarea } from './ui'
 
 /**
  * Création ou modification d'une adresse. Les villes et communes proposées sont
@@ -87,7 +87,7 @@ export default function AddressForm({ address, onSaved, onCancel }: { address?: 
           <Input label="Commune / sous-préfecture" value={form.commune} onChange={set('commune')} />
         )}
         <Input label="Quartier" value={form.quartier} onChange={set('quartier')} placeholder="Ex. : Kipé" required />
-        <Input label="Téléphone à appeler" type="tel" value={form.contact_phone} onChange={set('contact_phone')} placeholder="620 00 00 00" required />
+        <PhoneInput label="Téléphone à appeler" value={form.contact_phone} onValueChange={(contact_phone) => setForm({ ...form, contact_phone })} required />
         <Input label="Nom de l'adresse" value={form.label} onChange={set('label')} placeholder="Maison, Bureau…" />
       </div>
       <Textarea

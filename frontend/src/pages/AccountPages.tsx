@@ -6,10 +6,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import AddressForm from '../components/AddressForm'
 import { CurrencySwitcher } from '../components/Layout'
 import { ProductGrid } from '../components/ProductCard'
-import { Badge, Button, Empty, ErrorBox, Input, PageHeader, Spinner } from '../components/ui'
+import { Badge, Button, Empty, ErrorBox, Input, PageHeader, PhoneInput, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useToast } from '../context/toast'
-import { api, errorMessage } from '../lib/api'
+import { api, errorMessage, formatPhone } from '../lib/api'
 import type { Address, Paginated, ProductSummary, User } from '../lib/types'
 
 export function AccountPage() {
@@ -70,7 +70,7 @@ export function AccountPage() {
         <form onSubmit={submit} className="space-y-3">
           <Input label="Email" value={user?.email ?? ''} disabled />
           <Input label="Nom complet" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Input label="Téléphone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <PhoneInput label="Téléphone" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} />
           <ErrorBox message={error} />
           <Button type="submit" loading={saveProfile.isPending}>
             {saved ? 'Enregistré ✓' : 'Enregistrer'}
@@ -95,7 +95,7 @@ export function AccountPage() {
                     {a.label} · {a.quartier}, {a.commune || a.city} {a.is_default && <Badge tone="brand">Par défaut</Badge>}
                   </p>
                   <p className="text-sm text-ink/60">{a.landmark}</p>
-                  <p className="text-sm text-ink/60">{a.contact_phone}</p>
+                  <p className="text-sm text-ink/60">{formatPhone(a.contact_phone)}</p>
                   {!a.is_default && (
                     <button onClick={() => makeDefault.mutate(a.id)} className="mt-1 text-sm font-semibold text-primary-dark hover:underline">
                       Utiliser par défaut

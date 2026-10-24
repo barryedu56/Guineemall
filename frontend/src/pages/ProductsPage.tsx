@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import { ProductGrid, ProductGridSkeleton } from '../components/ProductCard'
 import { Button, Empty, Pager } from '../components/ui'
 import { useSiteConfig } from '../context/settings'
-import { api } from '../lib/api'
+import { api, formatNumber } from '../lib/api'
 import { useCategories } from '../lib/queries'
 import type { Paginated, ProductSummary } from '../lib/types'
 
@@ -50,16 +50,7 @@ export default function ProductsPage() {
       <FilterGroup title="Prix (GNF)">
         <div className="flex gap-2">
           {(['min_price', 'max_price'] as const).map((key) => (
-            <input
-              key={key}
-              type="number"
-              min={0}
-              placeholder={key === 'min_price' ? 'Min' : 'Max'}
-              defaultValue={params.get(key) ?? ''}
-              onBlur={(e) => update(key, e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && update(key, e.currentTarget.value)}
-              className="w-full rounded-2xl border border-ink/10 bg-surface px-3 py-2.5 outline-none focus:border-primary-dark focus:ring-4 focus:ring-primary/25"
-            />
+            <PriceFilter key={`${key}-${params.get(key) ?? ''}`} placeholder={key === 'min_price' ? 'Min' : 'Max'} initial={params.get(key) ?? ''} onCommit={(v) => update(key, v)} />
           ))}
         </div>
       </FilterGroup>
@@ -98,7 +89,7 @@ export default function ProductsPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold sm:text-3xl">{title}</h1>
-            {data && <p className="mt-1 text-ink/55">{data.count} produit{data.count > 1 ? 's' : ''}</p>}
+            {data && <p className="mt-1 text-ink/55">{formatNumber(data.count)} produit{data.count > 1 ? 's' : ''}</p>}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setFiltersOpen(true)}>
@@ -169,5 +160,22 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
         <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition ${checked ? 'left-[22px]' : 'left-0.5'}`} />
       </button>
     </label>
+  )
+}
+
+/** Prix minimum / maximum, affiché avec séparateur de milliers ; appliqué en quittant le champ ou avec Entrée. */
+function PriceFilter({ placeholder, initial, onCommit }: { placeholder: string; initial: string; onCommit: (v: string) => void }) {
+  const [digits, setDigits] = useState(initial)
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      placeholder={placeholder}
+      value={digits ? formatNumber(Number(digits)) : ''}
+      onChange={(e) => setDigits(e.target.value.replace(/\D/g, ''))}
+      onBlur={() => digits !== initial && onCommit(digits)}
+      onKeyDown={(e) => e.key === 'Enter' && onCommit(digits)}
+      className="w-full rounded-2xl border border-ink/10 bg-surface px-3 py-2.5 outline-none focus:border-primary-dark focus:ring-4 focus:ring-primary/25"
+    />
   )
 }

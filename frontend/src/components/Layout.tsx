@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Bike,
   Heart,
   Home,
@@ -21,14 +22,17 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
 import { setCurrency, useCurrency, useSiteConfig } from '../context/settings'
+import { formatPhone } from '../lib/api'
 import type { Currency } from '../lib/prefs'
 import { useCategories } from '../lib/queries'
+import { ROLE_HOME } from '../lib/roles'
 import { useConversations } from '../pages/chat/useConversations'
 import NotificationBell from './NotificationBell'
 import VoiceButton from './VoiceButton'
 
 export default function Layout() {
   const { data: config } = useSiteConfig()
+  const { user } = useAuth()
   const { pathname } = useLocation()
 
   // Titre de l'onglet tiré des réglages du site
@@ -48,12 +52,54 @@ export default function Layout() {
       )}
       <Header />
       <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-up px-4 py-6 sm:py-8">
+        <BackButton />
         <Outlet />
       </main>
-      {/* Pied de page uniquement sur l'accueil */}
-      {pathname === '/' && <Footer />}
+      {/* Pied de page uniquement sur l'accueil des visiteurs (jamais une fois connecté) */}
+      {pathname === '/' && !user && <Footer />}
       <MobileNav />
     </div>
+  )
+}
+
+// Page parente quand on arrive directement par un lien (pas de page précédente sur le site)
+const PARENTS: [RegExp, string][] = [
+  [/^\/produit\//, '/produits'],
+  [/^\/boutique\//, '/produits'],
+  [/^\/commandes\/.+/, '/commandes'],
+  [/^\/messages\/.+/, '/messages'],
+  [/^\/lives\/.+/, '/lives'],
+  [/^\/vendeur\/messages\/.+/, '/vendeur/messages'],
+  [/^\/vendeur\/.+/, '/vendeur'],
+  [/^\/paiement\//, '/commandes'],
+  [/^\/mot-de-passe\//, '/connexion'],
+]
+
+function parentOf(pathname: string, home: string) {
+  return PARENTS.find(([pattern]) => pattern.test(pathname))?.[1] ?? home
+}
+
+/**
+ * Bouton « Retour » en haut de chaque page, sauf sur l'accueil (public ou de l'espace du rôle).
+ * Revient à la page précédente du site ; si on est arrivé directement par un lien, remonte d'un niveau.
+ */
+function BackButton() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { pathname } = useLocation()
+  const home = user ? ROLE_HOME[user.role] : '/'
+  if (pathname === '/' || pathname === home) return null
+
+  function back() {
+    // react-router garde la position dans l'historique : idx > 0 = une page du site avant celle-ci
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1)
+    else navigate(parentOf(pathname, home))
+  }
+
+  return (
+    <button onClick={back} className="mb-4 inline-flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-4 text-sm font-semibold text-ink/70 transition hover:bg-ink/5 hover:text-ink">
+      <ArrowLeft className="size-4" /> Retour
+    </button>
   )
 }
 
@@ -347,7 +393,7 @@ function Footer() {
 
         <FooterColumn title="Nous contacter">
           {site?.contact_phone && (
-            <a href={`tel:${site.contact_phone}`} className="flex items-center gap-2 hover:text-white"><Phone className="size-4" /> {site.contact_phone}</a>
+            <a href={`tel:${site.contact_phone}`} className="flex items-center gap-2 hover:text-white"><Phone className="size-4" /> {formatPhone(site.contact_phone)}</a>
           )}
           {whatsapp && (
             <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-white">

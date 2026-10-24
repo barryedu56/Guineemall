@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
+from apps.core.formatting import gnf
 from apps.catalog.models import Product
 from apps.delivery.models import Delivery, DeliveryZone
 from apps.notifications.services import notify
@@ -241,7 +242,7 @@ def announce_order(order):
            "Les boutiques vont la confirmer et vous appeler pour la livraison.", f"/commandes/{order.id}")
     for vo in order.vendor_orders.select_related("vendor__user"):
         notify(vo.vendor.user, "order", f"Nouvelle commande #{order.id} 🛍️",
-               f"{vo.items.count()} article(s) – {vo.total_amount} GNF. Confirmez-la rapidement.", "/vendeur/commandes?statut=pending")
+               f"{vo.items.count()} article(s) – {gnf(vo.total_amount)}. Confirmez-la rapidement.", "/vendeur/commandes?statut=pending")
 
 
 @transaction.atomic
@@ -313,7 +314,7 @@ def _reward_referrer(order):
         return
     coupon = create_referral_coupon(user.referred_by, f"Parrainage de {user.name}")
     notify(user.referred_by, "promo", "Votre filleul a commandé 🎁",
-           f"Merci ! Voici votre bon de {coupon.value} GNF : {coupon.code}", "/compte")
+           f"Merci ! Voici votre bon de {gnf(coupon.value)} : {coupon.code}", "/compte")
 
 
 @transaction.atomic

@@ -7,7 +7,7 @@ import Price from '../components/Price'
 import { ProductGrid } from '../components/ProductCard'
 import { Button, Spinner } from '../components/ui'
 import { useSiteConfig } from '../context/settings'
-import { api } from '../lib/api'
+import { api, formatGNF, formatNumber } from '../lib/api'
 import { useCampaigns } from '../lib/queries'
 import type { Campaign, Referral } from '../lib/types'
 
@@ -74,7 +74,7 @@ export function ReferralPage() {
   if (isLoading || !data) return <Spinner />
 
   const siteName = config?.site.name ?? ''
-  const message = `Rejoins-moi sur ${siteName} ! Avec mon code ${data.code}, tu reçois un bon de ${new Intl.NumberFormat('fr-FR').format(data.reward)} GNF : ${data.link}`
+  const message = `Rejoins-moi sur ${siteName} ! Avec mon code ${data.code}, tu reçois un bon de ${formatGNF(data.reward)} : ${data.link}`
 
   async function share() {
     if (navigator.share) {
@@ -111,8 +111,8 @@ export function ReferralPage() {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <Stat icon={<Users />} value={String(data.referrals)} label="ami(s) inscrit(s)" />
-        <Stat icon={<Share2 />} value={String(data.affiliate_orders)} label="commande(s) via vos liens" />
+        <Stat icon={<Users />} value={data.referrals} label="ami(s) inscrit(s)" />
+        <Stat icon={<Share2 />} value={data.affiliate_orders} label="commande(s) via vos liens" />
         <Stat icon={<Gift />} value={<Price amount={data.affiliate_earnings} />} label="gagnés comme ambassadeur" />
       </section>
 
@@ -149,7 +149,7 @@ function Stat({ icon, value, label }: { icon: ReactNode; value: ReactNode; label
   return (
     <div className="rounded-2xl bg-surface p-4 text-center ring-1 ring-ink/5 [&>svg]:mx-auto [&>svg]:size-6 [&>svg]:text-primary-dark">
       {icon}
-      <p className="mt-1 text-xl font-extrabold">{value}</p>
+      <p className="mt-1 text-xl font-extrabold">{typeof value === 'number' ? formatNumber(value) : value}</p>
       <p className="text-sm text-ink/60">{label}</p>
     </div>
   )

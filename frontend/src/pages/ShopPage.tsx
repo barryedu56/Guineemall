@@ -8,7 +8,7 @@ import { ShopAvatar } from '../components/Statuts'
 import { Badge, Button, Empty, Pager, Skeleton } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useToast } from '../context/toast'
-import { api, errorMessage } from '../lib/api'
+import { api, errorMessage, formatNumber } from '../lib/api'
 import type { Conversation, Paginated, ProductSummary, Shop } from '../lib/types'
 
 export default function ShopPage() {
@@ -55,7 +55,7 @@ export default function ShopPage() {
               {shop.is_premium && <Badge tone="brand"><Crown className="size-3" /> Premium</Badge>}
             </h1>
             <div className="mt-1 flex flex-wrap gap-4 text-sm text-ink/60">
-              <span className="flex items-center gap-1"><Package className="size-4" /> {shop.products_count} produits</span>
+              <span className="flex items-center gap-1"><Package className="size-4" /> {formatNumber(shop.products_count ?? 0)} produits</span>
               {shop.rating ? (
                 <span className="flex items-center gap-1"><Star className="size-4 fill-primary text-primary" /> {shop.rating.toFixed(1)} ({shop.reviews_count} avis)</span>
               ) : null}
