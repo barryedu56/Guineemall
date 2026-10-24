@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.core.formatting import gnf
+
 from .models import Coupon
 
 
