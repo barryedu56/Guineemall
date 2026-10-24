@@ -6,9 +6,11 @@ from .models import Category, Product, ProductImage, Review, ReviewPhoto
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    products_count = serializers.IntegerField(read_only=True, default=0)
+
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "description", "image", "parent"]
+        fields = ["id", "name", "slug", "description", "image", "parent", "products_count"]
 
 
 class ProductImageSerializer(serializers.ModelSerializer):

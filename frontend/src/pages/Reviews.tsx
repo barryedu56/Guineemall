@@ -28,7 +28,7 @@ export default function Reviews({ slug }: { slug: string }) {
       {data?.results.length ? (
         <ul className="space-y-3">
           {data.results.map((r) => (
-            <li key={r.id} className="rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+            <li key={r.id} className="card p-4">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-semibold">{r.author}</span>
                 <Stars rating={r.rating} />
@@ -90,7 +90,7 @@ function ReviewForm({ slug, onDone }: { slug: string; onDone: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="mb-6 space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+    <form onSubmit={submit} className="mb-6 space-y-3 card p-4">
       <StarInput value={rating} onChange={setRating} />
       <Textarea label="Votre avis" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Qualité, livraison, conformité…" />
       <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-primary-dark">

@@ -6,11 +6,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import Price from '../components/Price'
 import { Button, Empty, ErrorBox, Input, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
+import { useSiteConfig } from '../context/settings'
 import { api, errorMessage } from '../lib/api'
 import type { RiderDelivery, RiderProfile } from '../lib/types'
 
 export function RiderRegisterPage() {
   const { registerRider } = useAuth()
+  const { data: config } = useSiteConfig()
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', city: 'Conakry', communes: '', vehicle_plate: '' })
   const [error, setError] = useState<string | null>(null)
@@ -32,9 +34,9 @@ export function RiderRegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-3xl bg-surface p-6 shadow-sm ring-1 ring-ink/5 sm:p-8">
+    <div className="card mx-auto max-w-md p-6 sm:p-10">
       <Bike className="size-10 text-primary-dark" />
-      <h1 className="mt-2 text-2xl font-bold">Devenir livreur GuinéeMall</h1>
+      <h1 className="mt-2 text-2xl font-bold">Devenir livreur {config?.site.name}</h1>
       <p className="mb-6 mt-1 text-ink/70">Livrez à moto dans votre quartier et soyez payé à chaque course.</p>
       <form onSubmit={submit} className="space-y-4">
         <Input label="Nom complet" value={form.name} onChange={set('name')} required />
@@ -97,6 +99,15 @@ export function RiderDashboard() {
   const active = mine?.results.filter((d) => d.status === 'assigned' || d.status === 'picked_up') ?? []
   const sharing = useShareLocation(active.some((d) => d.status === 'picked_up'))
 
+  const updateProfile = useMutation({
+    mutationFn: async (changes: Partial<RiderProfile>) => (await api.patch<RiderProfile>('/rider/profile/', changes)).data,
+    onSuccess: (p) => {
+      queryClient.setQueryData(['rider-profile'], p)
+      queryClient.invalidateQueries({ queryKey: ['rider-available'] })
+    },
+    onError: (e) => setError(errorMessage(e)),
+  })
+
   const act = useMutation({
     mutationFn: ({ id, step }: { id: number; step: 'accept' | 'pickup' | 'deliver' }) => api.post(`/rider/deliveries/${id}/${step}/`),
     onSuccess: () => {
@@ -120,9 +131,36 @@ export function RiderDashboard() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Mes courses</h1>
-        <Link to="/portefeuille" className="flex items-center gap-2 font-medium text-primary-dark"><Wallet className="size-5" /> Mon portefeuille</Link>
+        <h1 className="text-3xl font-extrabold">Mes courses</h1>
+        <Link to="/portefeuille" className="flex items-center gap-2 font-semibold text-primary-dark"><Wallet className="size-5" /> Mon portefeuille</Link>
       </div>
+
+      <section className="card flex flex-wrap items-center gap-4 p-5">
+        <button
+          onClick={() => updateProfile.mutate({ is_available: !profile.is_available })}
+          className={`flex items-center gap-3 rounded-full px-5 py-3 font-bold transition ${profile.is_available ? 'bg-green-600 text-white' : 'bg-ink/10 text-ink/60'}`}
+          aria-pressed={profile.is_available}
+        >
+          <span className={`size-3 rounded-full ${profile.is_available ? 'animate-pulse bg-white' : 'bg-ink/30'}`} />
+          {profile.is_available ? 'Disponible' : 'Indisponible'}
+        </button>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const value = new FormData(e.currentTarget).get('communes')
+            updateProfile.mutate({ communes: String(value ?? '') })
+          }}
+          className="flex min-w-60 flex-1 gap-2"
+        >
+          <input
+            name="communes"
+            defaultValue={profile.communes}
+            placeholder={`Communes desservies à ${profile.city} (vide = toutes)`}
+            className="min-w-0 flex-1 rounded-full border border-ink/10 px-4 py-2.5 text-sm"
+          />
+          <Button type="submit" variant="outline" size="sm" loading={updateProfile.isPending}>Enregistrer</Button>
+        </form>
+      </section>
       <ErrorBox message={error} />
 
       {active.length > 0 && (
@@ -144,7 +182,9 @@ export function RiderDashboard() {
 
       <section className="space-y-3">
         <h2 className="font-semibold">Courses disponibles à {profile.city}</h2>
-        {available.length ? (
+        {!profile.is_available ? (
+          <p className="text-sm text-ink/60">Passez « Disponible » pour voir les courses.</p>
+        ) : available.length ? (
           available.map((d) => (
             <DeliveryCard key={d.id} delivery={d}>
               <Button loading={act.isPending} onClick={() => act.mutate({ id: d.id, step: 'accept' })}>Accepter la course</Button>
@@ -163,7 +203,7 @@ export function RiderDashboard() {
 function DeliveryCard({ delivery: d, children }: { delivery: RiderDelivery; children: ReactNode }) {
   const map = d.dropoff.latitude ? `https://www.google.com/maps/dir/?api=1&destination=${d.dropoff.latitude},${d.dropoff.longitude}` : null
   return (
-    <article className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+    <article className="card space-y-3 p-5">
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold">Commande #{d.order_id} · {d.items_count} article(s)</p>
         <StatusBadge status={d.status === 'picked_up' ? 'processing' : d.status === 'open' ? 'pending' : 'confirmed'} label={d.status_label} />

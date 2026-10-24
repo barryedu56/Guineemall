@@ -8,17 +8,19 @@ import Price from '../components/Price'
 import { Button, ErrorBox, Input, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
+import { useSiteConfig } from '../context/settings'
 import { api, errorMessage } from '../lib/api'
 import { startPayment } from '../lib/payment'
 import { affiliateCode } from '../lib/prefs'
 import type { Address, Order, PaymentMethod, PickupPoint, Quote } from '../lib/types'
 
-const PAYMENTS: { value: PaymentMethod; label: string; text: string; icon: typeof Banknote }[] = [
-  { value: 'orange_money', label: 'Orange Money', text: 'Payez depuis votre téléphone, argent protégé', icon: Smartphone },
-  { value: 'mtn_momo', label: 'MTN Mobile Money', text: 'Validez sur votre téléphone MTN', icon: Smartphone },
-  { value: 'cash_on_delivery', label: 'Paiement à la livraison', text: 'En espèces, à la réception du colis', icon: Banknote },
-  { value: 'card', label: 'Carte bancaire (diaspora)', text: 'Visa, Mastercard – paiement en euros', icon: CreditCard },
-]
+// Icône de chaque mode de paiement (présentation) ; la liste et les textes viennent de /api/config/
+const PAYMENT_ICONS: Record<PaymentMethod, typeof Banknote> = {
+  orange_money: Smartphone,
+  mtn_momo: Smartphone,
+  cash_on_delivery: Banknote,
+  card: CreditCard,
+}
 
 export default function CheckoutPage() {
   const { user } = useAuth()
@@ -29,7 +31,10 @@ export default function CheckoutPage() {
   const [addressId, setAddressId] = useState<number | null>(null)
   const [pickupId, setPickupId] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [payment, setPayment] = useState<PaymentMethod>('orange_money')
+  const { data: config } = useSiteConfig()
+  const [chosenPayment, setPayment] = useState<PaymentMethod | null>(null)
+  const payment = chosenPayment ?? config?.payment_methods[0]?.value ?? 'cash_on_delivery'
+
   const [payerPhone, setPayerPhone] = useState(user?.phone ?? '')
   const [couponInput, setCouponInput] = useState('')
   const [coupon, setCoupon] = useState('')
@@ -93,14 +98,14 @@ export default function CheckoutPage() {
   if (lines.length === 0 && !placeOrder.isSuccess) return <Navigate to="/panier" replace />
 
   const radio = (active: boolean) =>
-    `flex cursor-pointer gap-3 rounded-xl p-3 ring-1 ${active ? 'bg-primary-light/40 ring-primary-dark' : 'ring-ink/10'}`
+    `flex cursor-pointer gap-3 rounded-2xl p-4 transition ring-1 ${active ? 'bg-primary-light/60 ring-2 ring-primary-dark' : 'ring-ink/10 hover:ring-ink/25'}`
 
   return (
     <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1fr_340px]">
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Finaliser la commande</h1>
+        <h1 className="text-3xl font-extrabold">Finaliser la commande</h1>
 
-        <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+        <section className="card p-6">
           <h2 className="mb-3 text-lg font-semibold">Livraison</h2>
           <div className="mb-4 grid grid-cols-2 gap-2">
             {[
@@ -110,7 +115,7 @@ export default function CheckoutPage() {
               <button
                 key={value}
                 onClick={() => setMethod(value)}
-                className={`flex items-center justify-center gap-2 rounded-xl p-3 text-sm font-medium ring-1 ${method === value ? 'bg-primary ring-primary-dark' : 'ring-ink/10'}`}
+                className={`flex items-center justify-center gap-2 rounded-2xl p-4 text-sm font-semibold transition ring-1 ${method === value ? 'bg-ink text-white ring-ink' : 'ring-ink/10 hover:ring-ink/25'}`}
               >
                 <Icon className="size-5" /> {label}
               </button>
@@ -174,19 +179,22 @@ export default function CheckoutPage() {
           )}
         </section>
 
-        <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+        <section className="card p-6">
           <h2 className="mb-3 text-lg font-semibold">Paiement</h2>
           <div className="space-y-2">
-            {PAYMENTS.map(({ value, label, text, icon: Icon }) => (
-              <label key={value} className={`${radio(payment === value)} items-center`}>
-                <input type="radio" checked={payment === value} onChange={() => setPayment(value)} className="accent-primary-dark" />
-                <Icon className="size-6 text-ink/60" />
-                <span>
-                  <span className="block font-medium">{label}</span>
-                  <span className="block text-sm text-ink/60">{text}</span>
-                </span>
-              </label>
-            ))}
+            {config?.payment_methods.map(({ value, label, description }) => {
+              const Icon = PAYMENT_ICONS[value]
+              return (
+                <label key={value} className={`${radio(payment === value)} items-center`}>
+                  <input type="radio" checked={payment === value} onChange={() => setPayment(value)} className="accent-primary-dark" />
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-background"><Icon className="size-5 text-ink/70" /></span>
+                  <span>
+                    <span className="block font-semibold">{label}</span>
+                    <span className="block text-sm text-ink/60">{description}</span>
+                  </span>
+                </label>
+              )
+            })}
           </div>
           {payment === 'mtn_momo' && (
             <div className="mt-3">
@@ -196,13 +204,14 @@ export default function CheckoutPage() {
           {payment !== 'cash_on_delivery' && (
             <p className="mt-3 flex gap-2 rounded-xl bg-green-50 p-3 text-sm text-green-800">
               <ShieldCheck className="size-5 shrink-0" />
-              Paiement protégé : la boutique n'est payée qu'une fois que vous avez confirmé la réception.
+              Paiement protégé : la boutique n'est payée qu'après votre confirmation de réception
+              {config ? ` (ou automatiquement ${config.escrow_days} jours après la livraison)` : ''}.
             </p>
           )}
         </section>
       </div>
 
-      <aside className="h-fit space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-ink/5 lg:sticky lg:top-24">
+      <aside className="h-fit space-y-4 card p-6 lg:sticky lg:top-24">
         <h2 className="font-semibold">Récapitulatif</h2>
         <ul className="space-y-1 text-sm">
           {lines.map((l) => (

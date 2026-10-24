@@ -10,14 +10,19 @@ def public_vendors():
     visible = Q(products__reviews__is_visible=True)
     return Vendor.objects.alive().filter(status=Vendor.Status.APPROVED).annotate(
         rating=Avg("products__reviews__rating", filter=visible),
-        reviews_count=Count("products__reviews", filter=visible),
-    )
+        reviews_count=Count("products__reviews", filter=visible, distinct=True),
+        products_count=Count(
+            "products", filter=Q(products__status="active", products__deleted_at__isnull=True), distinct=True
+        ),
+    ).order_by("-is_premium", "-is_verified", "shop_name")
 
 
 class VendorViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = VendorSerializer
     lookup_field = "slug"
     search_fields = ["shop_name"]
+    filterset_fields = ["is_verified", "is_premium"]
+    ordering_fields = ["rating", "created_at"]
 
     def get_queryset(self):
         return public_vendors()

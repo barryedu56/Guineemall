@@ -6,11 +6,14 @@ import { Link } from 'react-router-dom'
 import Price from '../../components/Price'
 import Stars from '../../components/Stars'
 import { Badge, Button, Empty, ErrorBox, Input, Select, Spinner, Textarea } from '../../components/ui'
+import { useSiteConfig } from '../../context/settings'
 import { api, errorMessage, formatDate } from '../../lib/api'
+import { fetchAll } from '../../lib/queries'
 import type { Coupon, Paginated, Review, VendorLive, VendorProduct } from '../../lib/types'
 
 export function VendorCouponsPage() {
   const queryClient = useQueryClient()
+  const { data: config } = useSiteConfig()
   const [form, setForm] = useState({ code: '', type: 'percent', value: '', min_amount: '0', usage_limit: '', ends_at: '', description: '' })
   const [error, setError] = useState<string | null>(null)
   const { data: coupons = [], isLoading } = useQuery({
@@ -46,13 +49,12 @@ export function VendorCouponsPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <form onSubmit={submit} className="h-fit space-y-3 rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+      <form onSubmit={submit} className="h-fit space-y-3 card p-5">
         <h2 className="text-lg font-semibold">Nouveau code promo</h2>
         <Input label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="TABASKI20" required />
         <div className="grid grid-cols-2 gap-3">
           <Select label="Type" value={form.type} onChange={set('type')}>
-            <option value="percent">Pourcentage</option>
-            <option value="fixed">Montant fixe</option>
+            {config?.choices.coupon_type.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </Select>
           <Input label={form.type === 'percent' ? 'Réduction (%)' : 'Réduction (GNF)'} type="number" min={1} value={form.value} onChange={set('value')} required />
         </div>
@@ -69,7 +71,7 @@ export function VendorCouponsPage() {
       <section>
         <h2 className="mb-3 text-lg font-semibold">Mes codes</h2>
         {isLoading ? <Spinner /> : !coupons.length ? <Empty icon={<Tag />} title="Aucun code promo" /> : (
-          <ul className="divide-y divide-ink/5 rounded-2xl bg-surface ring-1 ring-ink/5">
+          <ul className="divide-y divide-ink/5 card">
             {coupons.map((c) => (
               <li key={c.id} className="flex items-center gap-3 p-3">
                 <div className="flex-1">
@@ -107,7 +109,7 @@ export function VendorReviewsPage() {
   return (
     <ul className="space-y-3">
       {data.results.map((r) => (
-        <li key={r.id} className="space-y-2 rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+        <li key={r.id} className="space-y-2 card p-4">
           <div className="flex flex-wrap items-center gap-3">
             <Stars rating={r.rating} />
             <span className="font-semibold">{r.author}</span>
@@ -145,15 +147,16 @@ export function VendorReviewsPage() {
 
 export function VendorLivesPage() {
   const queryClient = useQueryClient()
+  const { data: config } = useSiteConfig()
   const [form, setForm] = useState({ title: '', stream_url: '', starts_at: '', description: '', product_slugs: [] as string[] })
   const [error, setError] = useState<string | null>(null)
   const { data: lives = [], isLoading } = useQuery({
     queryKey: ['vendor-lives'],
     queryFn: async () => (await api.get<VendorLive[]>('/vendor/lives/')).data,
   })
-  const { data: products } = useQuery({
-    queryKey: ['vendor-products'],
-    queryFn: async () => (await api.get<Paginated<VendorProduct>>('/vendor/products/')).data,
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['vendor-products', 'all'],
+    queryFn: () => fetchAll<VendorProduct>('/vendor/products/'),
   })
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['vendor-lives'] })
   const create = useMutation({
@@ -179,10 +182,10 @@ export function VendorLivesPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-      <form onSubmit={submit} className="h-fit space-y-3 rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+      <form onSubmit={submit} className="h-fit space-y-3 card p-5">
         <h2 className="text-lg font-semibold">Programmer un direct</h2>
         <p className="text-sm text-ink/60">
-          Lancez votre direct sur Facebook, YouTube ou TikTok, puis collez son lien ici : vos clients le regardent sur GuinéeMall
+          Lancez votre direct sur Facebook, YouTube ou TikTok, puis collez son lien ici : vos clients le regardent sur {config?.site.name}
           et achètent les produits affichés en dessous.
         </p>
         <Input label="Titre" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
@@ -192,7 +195,7 @@ export function VendorLivesPage() {
         <fieldset>
           <legend className="text-sm font-medium">Produits présentés</legend>
           <div className="mt-1 max-h-40 space-y-1 overflow-y-auto">
-            {products?.results.map((p) => (
+            {allProducts.map((p) => (
               <label key={p.slug} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -216,7 +219,7 @@ export function VendorLivesPage() {
 
       <section className="space-y-3">
         {isLoading ? <Spinner /> : !lives.length ? <Empty icon={<Radio />} title="Aucun direct" /> : lives.map((l) => (
-          <article key={l.id} className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+          <article key={l.id} className="space-y-3 card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="font-semibold">{l.title}</p>
@@ -242,7 +245,7 @@ export function VendorLivesPage() {
                 <div className="flex flex-wrap gap-2">
                   {l.product_slugs.map((slug) => (
                     <button key={slug} onClick={() => action.mutate({ id: l.id, kind: 'pin', product: slug })} className="rounded-full bg-background px-3 py-1 text-sm ring-1 ring-ink/10 hover:bg-primary-light">
-                      {products?.results.find((p) => p.slug === slug)?.name ?? slug}
+                      {allProducts.find((p) => p.slug === slug)?.name ?? slug}
                     </button>
                   ))}
                 </div>

@@ -1,5 +1,6 @@
 import { CircleDot, Clock, LayoutDashboard, MessageCircle, MessageSquareQuote, Package, Radio, ShoppingBag, Store, Tag, Wallet } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useSiteConfig } from '../../context/settings'
 
 import { Spinner } from '../../components/ui'
 import ShopSettingsPage from './ShopSettingsPage'
@@ -20,6 +21,7 @@ const TABS = [
 
 export default function VendorLayout() {
   const { data: shop, isLoading } = useMyShop()
+  const { data: config } = useSiteConfig()
 
   if (isLoading) return <Spinner />
   if (!shop) return <p className="py-16 text-center">Boutique introuvable.</p>
@@ -40,7 +42,7 @@ export default function VendorLayout() {
             <p className="text-sm">
               {shop.status === 'pending'
                 ? "Notre équipe vérifie vos informations. En attendant, vous pouvez compléter la présentation de votre boutique."
-                : "Contactez l'équipe GuinéeMall pour en savoir plus."}
+                : `Contactez l'équipe ${config?.site.name ?? ''} pour en savoir plus.`}
             </p>
           </div>
         </div>

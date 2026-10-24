@@ -3,7 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import RequireAuth from './components/RequireAuth'
 import { AccountPage, FavoritesPage } from './pages/AccountPages'
-import { LoginPage, RegisterPage, VendorRegisterPage } from './pages/AuthPages'
+import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VendorRegisterPage } from './pages/AuthPages'
 import CartPage from './pages/CartPage'
 import ChatPage from './pages/chat/ChatPage'
 import CheckoutPage from './pages/CheckoutPage'
@@ -23,6 +23,7 @@ import { VendorCouponsPage, VendorLivesPage, VendorReviewsPage } from './pages/v
 import VendorOrdersPage from './pages/vendor/VendorOrdersPage'
 import VendorProductsPage from './pages/vendor/VendorProductsPage'
 import VendorStatutsPage from './pages/vendor/VendorStatutsPage'
+import NotFound from './pages/NotFound'
 import WalletPage from './pages/WalletPage'
 
 export default function App() {
@@ -40,6 +41,8 @@ export default function App() {
           <Route path="/panier" element={<CartPage />} />
           <Route path="/connexion" element={<LoginPage />} />
           <Route path="/inscription" element={<RegisterPage />} />
+          <Route path="/mot-de-passe/oublie" element={<ForgotPasswordPage />} />
+          <Route path="/mot-de-passe/nouveau" element={<ResetPasswordPage />} />
           <Route path="/devenir-vendeur" element={<VendorRegisterPage />} />
           <Route path="/devenir-livreur" element={<RiderRegisterPage />} />
 
@@ -69,7 +72,7 @@ export default function App() {
             <Route path="boutique" element={<ShopSettingsPage />} />
           </Route>
 
-          <Route path="*" element={<p className="py-16 text-center text-lg">Page introuvable.</p>} />
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
     </BrowserRouter>

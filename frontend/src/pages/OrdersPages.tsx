@@ -1,27 +1,23 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bike, CheckCircle2, Clock, MapPin, Package, Phone, Star, XCircle } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import Price from '../components/Price'
-import { Button, Empty, ErrorBox, Input, Spinner, StatusBadge } from '../components/ui'
+import { Button, Empty, ErrorBox, Input, PageHeader, Pager, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useRealtime } from '../context/realtime'
+import { useSiteConfig } from '../context/settings'
 import { api, errorMessage, formatDate } from '../lib/api'
 import { startPayment } from '../lib/payment'
 import type { Order, Paginated } from '../lib/types'
 
-const PAYMENT_LABELS = {
-  cash_on_delivery: 'Paiement à la livraison',
-  orange_money: 'Orange Money',
-  mtn_momo: 'MTN Mobile Money',
-  card: 'Carte bancaire',
-}
-
 export function OrdersPage() {
+  const [page, setPage] = useState(1)
   const { data, isLoading } = useQuery({
-    queryKey: ['orders'],
-    queryFn: async () => (await api.get<Paginated<Order>>('/orders/')).data,
+    queryKey: ['orders', 'page', page],
+    queryFn: async () => (await api.get<Paginated<Order>>('/orders/', { params: { page } })).data,
+    placeholderData: keepPreviousData,
   })
 
   if (isLoading) return <Spinner />
@@ -35,11 +31,11 @@ export function OrdersPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-3">
-      <h1 className="mb-4 text-2xl font-bold">Mes commandes</h1>
+      <PageHeader title="Mes commandes" subtitle={`${data.count} commande${data.count > 1 ? 's' : ''}`} />
       {data.results.map((order) => (
-        <Link key={order.id} to={`/commandes/${order.id}`} className="flex items-center justify-between gap-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5 hover:ring-primary">
+        <Link key={order.id} to={`/commandes/${order.id}`} className="card card-hover flex items-center justify-between gap-3 p-5">
           <div>
-            <p className="font-semibold">Commande #{order.id}</p>
+            <p className="font-bold">Commande #{order.id}</p>
             <p className="text-sm text-ink/60">
               {formatDate(order.created_at)} · {order.vendor_orders.reduce((n, vo) => n + vo.items.length, 0)} article(s)
             </p>
@@ -51,6 +47,7 @@ export function OrdersPage() {
           </div>
         </Link>
       ))}
+      <Pager page={data.page} totalPages={data.total_pages} onChange={setPage} />
     </div>
   )
 }
@@ -95,6 +92,7 @@ function PaymentBanner({ reference, onDone }: { reference: string; onDone: () =>
 export function OrderDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const { data: config } = useSiteConfig()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -151,7 +149,7 @@ export function OrderDetailPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Commande #{order.id}</h1>
+          <h1 className="text-3xl font-extrabold">Commande #{order.id}</h1>
           <p className="text-sm text-ink/60">{formatDate(order.created_at)}</p>
         </div>
         <StatusBadge status={order.status} label={order.status_label} />
@@ -160,7 +158,8 @@ export function OrderDetailPage() {
       {order.awaiting_payment && (
         <section className="space-y-3 rounded-2xl bg-amber-50 p-4">
           <p className="font-semibold text-amber-900">
-            Paiement {PAYMENT_LABELS[order.payment_method]} en attente – la commande sera annulée si elle n'est pas payée sous 30 minutes.
+            Paiement {order.payment_method_label} en attente
+            {config ? ` – la commande sera annulée si elle n'est pas payée sous ${config.unpaid_timeout_minutes} minutes.` : '.'}
           </p>
           {order.payment_method === 'mtn_momo' && (
             <Input label="Numéro MTN qui paie" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -184,7 +183,7 @@ export function OrderDetailPage() {
       {order.vendor_orders.map((vo) => {
         const position = riderPositions[order.id] ?? (vo.tracking?.latitude ? { latitude: vo.tracking.latitude, longitude: vo.tracking.longitude! } : null)
         return (
-          <section key={vo.id} className="rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+          <section key={vo.id} className="card p-5">
             <div className="mb-2 flex items-center justify-between">
               <Link to={`/boutique/${vo.shop_slug}`} className="font-semibold hover:underline">{vo.shop_name}</Link>
               <StatusBadge status={vo.status} label={vo.status_label} />
@@ -223,7 +222,7 @@ export function OrderDetailPage() {
         )
       })}
 
-      <section className="grid gap-4 rounded-2xl bg-surface p-4 ring-1 ring-ink/5 sm:grid-cols-2">
+      <section className="grid gap-4 card p-5 sm:grid-cols-2">
         <div>
           <h2 className="mb-1 text-sm font-semibold text-ink/60">{order.delivery_method === 'pickup' ? 'Retrait en point relais' : 'Livraison'}</h2>
           {order.delivery_name && <p className="font-medium">Pour : {order.delivery_name}</p>}
@@ -232,7 +231,7 @@ export function OrderDetailPage() {
           <p className="text-sm text-ink/70">{order.delivery_phone}</p>
         </div>
         <dl className="space-y-1 text-sm">
-          <h2 className="mb-1 font-semibold text-ink/60">Paiement · {PAYMENT_LABELS[order.payment_method]}</h2>
+          <h2 className="mb-1 font-semibold text-ink/60">Paiement · {order.payment_method_label}</h2>
           <div className="flex justify-between"><dt>Articles</dt><dd><Price amount={order.subtotal} /></dd></div>
           <div className="flex justify-between"><dt>Livraison</dt><dd><Price amount={order.delivery_fee} /></dd></div>
           {order.discount_amount > 0 && (
@@ -242,6 +241,21 @@ export function OrderDetailPage() {
           <p className="text-ink/60">{order.payment_status_label}</p>
         </dl>
       </section>
+
+      {order.status_history.length > 0 && (
+        <section className="card p-5">
+          <h2 className="mb-4 font-bold">Suivi</h2>
+          <ol className="relative space-y-4 border-l-2 border-ink/10 pl-6">
+            {order.status_history.map((h, i) => (
+              <li key={i} className="relative">
+                <span className={`absolute -left-[31px] top-1 size-4 rounded-full ring-4 ring-surface ${i === order.status_history.length - 1 ? 'bg-primary-dark' : 'bg-ink/20'}`} />
+                <p className="font-semibold">{h.note || config?.choices.order_status.find((c) => c.value === h.status)?.label || h.status}</p>
+                <p className="text-sm text-ink/55">{formatDate(h.created_at)}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       <ErrorBox message={error} />
       {cancellable && (

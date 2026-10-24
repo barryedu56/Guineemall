@@ -26,7 +26,7 @@ export function LiveStrip() {
 
 function LiveCard({ live }: { live: Live }) {
   return (
-    <Link to={`/lives/${live.id}`} className="w-64 shrink-0 rounded-2xl bg-surface p-4 ring-1 ring-ink/5 hover:ring-primary">
+    <Link to={`/lives/${live.id}`} className="w-64 shrink-0 card p-4 hover:ring-primary">
       <div className="flex items-center gap-2">
         <ShopAvatar logo={live.shop.logo} name={live.shop.shop_name} className="size-9" />
         <span className="truncate font-semibold">{live.shop.shop_name}</span>
@@ -137,7 +137,7 @@ function LiveRoom({ live }: { live: Live }) {
         )}
       </div>
 
-      <aside className="flex h-[70vh] flex-col rounded-2xl bg-surface ring-1 ring-ink/5 lg:sticky lg:top-24">
+      <aside className="flex h-[70vh] flex-col card lg:sticky lg:top-24">
         <p className="border-b border-ink/5 px-4 py-3 font-semibold">Commentaires</p>
         <div className="flex-1 space-y-2 overflow-y-auto p-3 text-sm">
           {comments.map((c) => (

@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 
 import { Badge, Button, Empty, ErrorBox, Input, Select, Spinner } from '../../components/ui'
 import { api, errorMessage, timeAgo } from '../../lib/api'
+import { fetchAll } from '../../lib/queries'
 import type { Paginated, VendorProduct, VendorStatut } from '../../lib/types'
 
 export default function VendorStatutsPage() {
@@ -41,9 +42,9 @@ function PublishForm() {
   const [error, setError] = useState<string | null>(null)
   const preview = useMemo(() => (media ? URL.createObjectURL(media) : null), [media])
 
-  const { data: products } = useQuery({
-    queryKey: ['vendor-products'],
-    queryFn: async () => (await api.get<Paginated<VendorProduct>>('/vendor/products/')).data,
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['vendor-products', 'all'],
+    queryFn: () => fetchAll<VendorProduct>('/vendor/products/'),
   })
 
   const publish = useMutation({
@@ -71,7 +72,7 @@ function PublishForm() {
   }
 
   return (
-    <form onSubmit={submit} className="h-fit space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+    <form onSubmit={submit} className="h-fit space-y-4 card p-5">
       <h2 className="text-lg font-semibold">Publier un statut</h2>
       <label className="relative flex aspect-[9/16] max-h-80 w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-ink/5 text-ink/50 hover:bg-ink/10">
         {preview ? (
@@ -91,7 +92,7 @@ function PublishForm() {
       <Input label="Légende" value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={280} placeholder="Nouvel arrivage ! -20 % ce week-end" />
       <Select label="Produit à mettre en avant (optionnel)" value={product} onChange={(e) => setProduct(e.target.value)}>
         <option value="">Aucun</option>
-        {products?.results.map((p) => (
+        {allProducts.map((p) => (
           <option key={p.slug} value={p.slug}>
             {p.name}
           </option>
@@ -122,7 +123,7 @@ function StatutCard({ statut }: { statut: VendorStatut }) {
   })
 
   return (
-    <div className={`overflow-hidden rounded-2xl bg-surface ring-1 ring-ink/5 ${statut.is_active ? '' : 'opacity-60'}`}>
+    <div className={`overflow-hidden card ${statut.is_active ? '' : 'opacity-60'}`}>
       <div className="relative aspect-[9/16] bg-black">
         {statut.media_type === 'video' ? (
           <video src={statut.media} className="size-full object-cover" muted playsInline />
@@ -133,7 +134,7 @@ function StatutCard({ statut }: { statut: VendorStatut }) {
           {statut.is_active ? <Badge tone="success">En ligne</Badge> : <Badge>Expiré</Badge>}
         </div>
         {statut.caption && (
-          <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 p-2 pt-6 text-xs text-white">{statut.caption}</p>
+          <p className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 p-2 pt-6 text-xs text-white">{statut.caption}</p>
         )}
       </div>
       <div className="flex items-center gap-1 p-2 text-sm">

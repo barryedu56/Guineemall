@@ -47,7 +47,7 @@ export default function CartPage() {
         <h1 className="text-2xl font-bold">Mon panier</h1>
         <ErrorBox message={error} />
         {Object.entries(byShop).map(([shop, shopLines]) => (
-          <div key={shop} className="rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+          <div key={shop} className="card p-4">
             <Link to={`/boutique/${shop}`} className="mb-3 block text-sm font-semibold text-ink/60 hover:underline">
               Boutique : {shop}
             </Link>
@@ -99,7 +99,7 @@ export default function CartPage() {
         ))}
       </section>
 
-      <aside className="h-fit space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-ink/5 lg:sticky lg:top-24">
+      <aside className="h-fit space-y-4 card p-5 lg:sticky lg:top-24">
         <div className="flex justify-between text-lg">
           <span>Total</span>
           <span className="font-bold"><Price amount={total} /></span>

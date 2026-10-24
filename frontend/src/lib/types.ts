@@ -2,6 +2,8 @@
 
 export interface Paginated<T> {
   count: number
+  total_pages: number
+  page: number
   next: string | null
   previous: string | null
   results: T[]
@@ -33,6 +35,8 @@ export interface Shop {
   is_premium?: boolean
   rating?: number | null
   reviews_count?: number
+  products_count?: number
+  created_at: string
 }
 
 export interface MyShop extends Shop {
@@ -46,6 +50,7 @@ export interface Category {
   description: string
   image: string | null
   parent: number | null
+  products_count: number
 }
 
 export interface ProductImage {
@@ -142,6 +147,7 @@ export interface Order {
   status: OrderStatus
   status_label: string
   payment_method: PaymentMethod
+  payment_method_label: string
   payment_status: string
   payment_status_label: string
   awaiting_payment: boolean
@@ -183,6 +189,7 @@ export interface VendorSideOrder {
   status: VendorOrderStatus
   status_label: string
   payment_method: PaymentMethod
+  payment_method_label: string
   payment_status: string
   delivery_method: 'home' | 'pickup'
   items: OrderItem[]
@@ -232,12 +239,44 @@ export interface VendorStatut {
   expires_at: string
 }
 
+export interface Choice {
+  value: string
+  label: string
+}
+
 export interface SiteConfig {
+  site: {
+    name: string
+    tagline: string
+    announcement: string
+    hero_title: string
+    hero_subtitle: string
+    hero_image: string | null
+    contact_phone: string
+    contact_whatsapp: string
+    contact_email: string
+    address: string
+    social: Partial<Record<'facebook' | 'instagram' | 'tiktok', string>>
+  }
+  payment_methods: { value: PaymentMethod; label: string; description: string }[]
+  delivery_locations: { city: string; communes: string[] }[]
+  choices: {
+    order_status: Choice[]
+    payment_method: Choice[]
+    vendor_order_status: (Choice & { action: string })[]
+    document_type: Choice[]
+    payout_method: Choice[]
+    coupon_type: Choice[]
+    product_sort: Choice[]
+  }
   exchange_rates: Record<'EUR' | 'USD', number>
   payment_simulation: boolean
   referral_reward: number
   affiliate_rate: number
+  commission_rate: number
   escrow_days: number
+  unpaid_timeout_minutes: number
+  page_size: number
 }
 
 export interface Quote {

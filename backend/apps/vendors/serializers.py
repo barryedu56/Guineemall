@@ -6,12 +6,13 @@ from .models import Vendor, VerificationRequest
 class VendorSerializer(serializers.ModelSerializer):
     rating = serializers.FloatField(read_only=True, default=None)
     reviews_count = serializers.IntegerField(read_only=True, default=0)
+    products_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Vendor
         fields = [
             "id", "slug", "shop_name", "description", "logo", "whatsapp", "is_verified", "is_premium",
-            "rating", "reviews_count", "created_at",
+            "rating", "reviews_count", "products_count", "created_at",
         ]
 
 

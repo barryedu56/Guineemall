@@ -1,18 +1,79 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
 
-/* Couleurs de la marque GuinéeMall (reprises de l'ancien projet) */
+/* Système de design GuinéeMall : jaune/orange de la marque, encre profonde, surfaces douces */
 @theme {
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
   --color-primary: #ffc107;
   --color-primary-hover: #ffb300;
-  --color-primary-light: #ffe082;
-  --color-primary-dark: #ff8f00;
+  --color-primary-light: #fff3cd;
+  --color-primary-dark: #e07b00;
   --color-secondary: #ffa726;
   --color-secondary-dark: #ef6c00;
   --color-surface: #ffffff;
-  --color-background: #f8f9fa;
-  --color-ink: #212529;
+  --color-background: #f6f5f2;
+  --color-ink: #1b1d21;
+  --color-success: #15803d;
+  --color-danger: #dc2626;
+
+  --shadow-card: 0 1px 2px rgb(27 29 33 / 0.04), 0 4px 16px -4px rgb(27 29 33 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(27 29 33 / 0.05), 0 16px 32px -8px rgb(27 29 33 / 0.16);
+
+  --animate-fade-up: fade-up 0.35s ease-out both;
+  --animate-toast: toast-in 0.25s ease-out both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Carte de base de toutes les sections */
+@utility card {
+  background-color: var(--color-surface);
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgb(27 29 33 / 0.05);
+}
+
+@utility card-hover {
+  transition: box-shadow 0.2s, transform 0.2s;
+  &:hover {
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-2px);
+  }
+}
+
+@utility skeleton {
+  border-radius: 0.75rem;
+  background: linear-gradient(90deg, rgb(27 29 33 / 0.06), rgb(27 29 33 / 0.1), rgb(27 29 33 / 0.06));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite linear;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 body {
-  @apply bg-background text-ink antialiased;
+  @apply bg-background font-sans text-ink antialiased;
+}
+
+h1, h2, h3 {
+  @apply tracking-tight;
+}
+
+::selection {
+  @apply bg-primary/40;
 }

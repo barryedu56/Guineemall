@@ -6,6 +6,7 @@ import App from './App'
 import { AuthProvider } from './context/AuthProvider'
 import { CartProvider } from './context/CartProvider'
 import { RealtimeProvider } from './context/RealtimeProvider'
+import { ToastProvider } from './context/ToastProvider'
 import './index.css'
 import { captureAffiliateCode } from './lib/prefs'
 
@@ -25,7 +26,9 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <RealtimeProvider>
           <CartProvider>
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </CartProvider>
         </RealtimeProvider>
       </AuthProvider>

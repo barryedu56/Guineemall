@@ -41,7 +41,13 @@ def public_products():
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Category.objects.filter(status=Category.Status.ACTIVE)
+    queryset = Category.objects.filter(status=Category.Status.ACTIVE).annotate(
+        products_count=Count(
+            "products",
+            filter=Q(products__status=Product.Status.ACTIVE, products__deleted_at__isnull=True,
+                     products__vendor__status=Vendor.Status.APPROVED),
+        )
+    )
     serializer_class = CategorySerializer
     lookup_field = "slug"
     pagination_class = None

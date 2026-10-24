@@ -133,6 +133,10 @@ Sans jeton, les messages sont seulement écrits dans les logs du worker Celery.
 
 ## Administration (http://127.0.0.1:8000/admin)
 
+- **Réglages du site** : nom, slogan, bandeau d'annonce, texte et image de l'accueil, coordonnées,
+  réseaux sociaux, modes de paiement proposés. Le front ne contient aucune de ces valeurs en dur :
+  il les lit sur `/api/config/`, tout comme les listes de statuts, les villes et communes livrées, etc.
+
 - **Boutiques** : action « Approuver » (le vendeur est notifié)
 - **Demandes de vérification** : voir les documents, action « Accepter (donner le badge) »
 - **Livreurs** : action « Valider »

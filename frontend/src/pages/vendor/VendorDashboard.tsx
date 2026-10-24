@@ -52,7 +52,7 @@ export default function VendorDashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+        <section className="card p-5">
           <h2 className="mb-3 font-semibold">Produits les plus vendus</h2>
           {stats.top_products.length ? (
             <table className="w-full text-sm">
@@ -74,7 +74,7 @@ export default function VendorDashboard() {
           )}
         </section>
 
-        <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+        <section className="card p-5">
           <h2 className="mb-3 font-semibold">Ventes par jour</h2>
           {stats.by_day.length ? (
             <table className="w-full text-sm">
@@ -96,7 +96,7 @@ export default function VendorDashboard() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         {activeStatuts === 0 && (
-          <Link to="/vendeur/statuts" className="block rounded-2xl bg-gradient-to-r from-primary to-secondary p-5">
+          <Link to="/vendeur/statuts" className="block rounded-2xl bg-linear-to-r from-primary to-secondary p-5">
             <p className="flex items-center gap-2 font-bold"><CircleDot className="size-5" /> Publiez un statut aujourd'hui</p>
             <p className="text-sm text-ink/80">Vos statuts apparaissent en haut de l'accueil pendant 24 h.</p>
           </Link>
@@ -121,6 +121,6 @@ function Tile({ icon, label, value, sub, to }: { icon: ReactNode; label: string;
       {sub && <p className="text-xs text-ink/50">{sub}</p>}
     </>
   )
-  const className = 'rounded-2xl bg-surface p-4 ring-1 ring-ink/5'
+  const className = 'card p-4'
   return to ? <Link to={to} className={`${className} hover:ring-primary`}>{body}</Link> : <div className={className}>{body}</div>
 }

@@ -27,7 +27,7 @@ export default function StatutsBar() {
         {groups.map((group, index) => (
           <button key={group.vendor.slug} onClick={() => setOpened(index)} className="flex w-18 shrink-0 flex-col items-center gap-1.5">
             <span
-              className={`rounded-full p-0.5 ${group.all_seen ? 'bg-ink/15' : 'bg-gradient-to-tr from-secondary-dark via-primary-dark to-primary'}`}
+              className={`rounded-full p-0.5 ${group.all_seen ? 'bg-ink/15' : 'bg-linear-to-tr from-secondary-dark via-primary-dark to-primary'}`}
             >
               <span className="block rounded-full bg-surface p-0.5">
                 <ShopAvatar logo={group.vendor.logo} name={group.vendor.shop_name} className="size-16" />
@@ -197,7 +197,7 @@ function StatutSlide({
       </div>
 
       {/* Légende + produit */}
-      <div className="absolute inset-x-0 bottom-0 z-10 space-y-3 bg-gradient-to-t from-black/80 to-transparent p-4 pt-12 text-white">
+      <div className="absolute inset-x-0 bottom-0 z-10 space-y-3 bg-linear-to-t from-black/80 to-transparent p-4 pt-12 text-white">
         {statut.caption && <p className="text-center">{statut.caption}</p>}
         {statut.product && (
           <Link

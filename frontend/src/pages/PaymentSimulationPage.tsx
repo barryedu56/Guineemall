@@ -13,7 +13,7 @@ export default function PaymentSimulationPage() {
   const { data: payment, isLoading } = useQuery({
     queryKey: ['payment', reference],
     queryFn: async () =>
-      (await api.get<{ order_id: number; amount: number; provider: string; status: string }>(`/payments/${reference}/`)).data,
+      (await api.get<{ order_id: number; amount: number; provider_label: string; status: string }>(`/payments/${reference}/`)).data,
   })
   const decide = useMutation({
     mutationFn: (result: 'success' | 'failed') => api.post(`/payments/simulation/${reference}/`, { result }),
@@ -21,13 +21,12 @@ export default function PaymentSimulationPage() {
   })
 
   if (isLoading || !payment) return <Spinner />
-  const labels: Record<string, string> = { orange_money: 'Orange Money', mtn_momo: 'MTN Mobile Money', card: 'Carte bancaire' }
 
   return (
-    <div className="mx-auto max-w-sm space-y-5 rounded-3xl bg-surface p-6 text-center ring-1 ring-ink/5">
+    <div className="card mx-auto max-w-sm space-y-5 p-8 text-center">
       <FlaskConical className="mx-auto size-10 text-primary-dark" />
       <div>
-        <p className="text-sm text-ink/60">Paiement simulé · {labels[payment.provider]}</p>
+        <p className="text-sm text-ink/60">Paiement simulé · {payment.provider_label}</p>
         <Price amount={payment.amount} className="mt-1 block text-3xl font-extrabold" />
       </div>
       <p className="text-sm text-ink/70">

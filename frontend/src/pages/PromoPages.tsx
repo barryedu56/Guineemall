@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom'
 import Price from '../components/Price'
 import { ProductGrid } from '../components/ProductCard'
 import { Button, Spinner } from '../components/ui'
+import { useSiteConfig } from '../context/settings'
 import { api } from '../lib/api'
 import { useCampaigns } from '../lib/queries'
 import type { Campaign, Referral } from '../lib/types'
@@ -65,17 +66,19 @@ export function CampaignPage() {
 
 export function ReferralPage() {
   const [copied, setCopied] = useState(false)
+  const { data: config } = useSiteConfig()
   const { data, isLoading } = useQuery({
     queryKey: ['referral'],
     queryFn: async () => (await api.get<Referral>('/auth/referral/')).data,
   })
   if (isLoading || !data) return <Spinner />
 
-  const message = `Rejoins-moi sur GuinéeMall, le marché guinéen en ligne ! Avec mon code ${data.code}, tu reçois un bon de ${new Intl.NumberFormat('fr-FR').format(data.reward)} GNF : ${data.link}`
+  const siteName = config?.site.name ?? ''
+  const message = `Rejoins-moi sur ${siteName} ! Avec mon code ${data.code}, tu reçois un bon de ${new Intl.NumberFormat('fr-FR').format(data.reward)} GNF : ${data.link}`
 
   async function share() {
     if (navigator.share) {
-      await navigator.share({ title: 'GuinéeMall', text: message }).catch(() => {})
+      await navigator.share({ title: siteName, text: message }).catch(() => {})
       return
     }
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener')
@@ -83,7 +86,7 @@ export function ReferralPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <section className="rounded-3xl bg-gradient-to-br from-primary to-secondary p-6 text-center">
+      <section className="rounded-3xl bg-linear-to-br from-primary to-secondary p-6 text-center">
         <Gift className="mx-auto size-12" />
         <h1 className="mt-2 text-2xl font-extrabold">Invitez vos amis, gagnez des bons</h1>
         <p className="mt-2 text-ink/80">
@@ -113,7 +116,7 @@ export function ReferralPage() {
         <Stat icon={<Gift />} value={<Price amount={data.affiliate_earnings} />} label="gagnés comme ambassadeur" />
       </section>
 
-      <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+      <section className="card p-5">
         <h2 className="font-semibold">Programme ambassadeur</h2>
         <p className="mt-1 text-sm text-ink/70">
           Partagez n'importe quel produit avec le bouton « Partager » : vous touchez {Math.round(data.affiliate_rate * 100)} % de chaque
@@ -123,7 +126,7 @@ export function ReferralPage() {
       </section>
 
       {data.coupons.length > 0 && (
-        <section className="rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+        <section className="card p-5">
           <h2 className="mb-2 font-semibold">Mes bons de réduction</h2>
           <ul className="space-y-2">
             {data.coupons.map((c) => (

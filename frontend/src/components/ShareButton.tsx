@@ -1,5 +1,6 @@
 import { Share2 } from 'lucide-react'
 import { useState } from 'react'
+import { useSiteConfig } from '../context/settings'
 
 import { useAuth } from '../context/auth'
 import { Button } from './ui'
@@ -12,7 +13,8 @@ export default function ShareButton({ slug, name }: { slug: string; name: string
   const { user } = useAuth()
   const [copied, setCopied] = useState(false)
   const url = `${window.location.origin}/produit/${slug}${user ? `?ref=${user.referral_code}` : ''}`
-  const text = `${name} sur GuinéeMall`
+  const { data: config } = useSiteConfig()
+  const text = `${name} sur ${config?.site.name ?? ''}`
 
   async function share() {
     try {

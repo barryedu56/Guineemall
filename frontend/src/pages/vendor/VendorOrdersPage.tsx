@@ -1,48 +1,36 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bike, Lock, MapPin, Phone, ShoppingBag, Store } from 'lucide-react'
 import { useState } from 'react'
 
-import { Button, Empty, ErrorBox, Spinner, StatusBadge } from '../../components/ui'
+import { Button, Empty, ErrorBox, Pager, Spinner, StatusBadge } from '../../components/ui'
+import { useSiteConfig } from '../../context/settings'
 import { api, errorMessage, formatDate, formatGNF } from '../../lib/api'
 import type { Paginated, VendorOrderStatus, VendorSideOrder } from '../../lib/types'
 
-const FILTERS: { value: string; label: string }[] = [
-  { value: '', label: 'Toutes' },
-  { value: 'pending', label: 'À confirmer' },
-  { value: 'confirmed', label: 'Confirmées' },
-  { value: 'preparing', label: 'En préparation' },
-  { value: 'ready', label: 'Prêtes' },
-  { value: 'delivered', label: 'Livrées' },
-  { value: 'cancelled', label: 'Annulées' },
-]
-
-const ACTIONS: Record<VendorOrderStatus, string> = {
-  pending: '',
-  confirmed: 'Confirmer',
-  preparing: 'Commencer la préparation',
-  ready: 'Marquer prête (un livreur GuinéeMall peut la prendre)',
-  delivered: 'Marquer livrée',
-  cancelled: 'Refuser / annuler',
-}
-
-const PAYMENT_LABELS = { cash_on_delivery: 'À la livraison', orange_money: 'Orange Money', mtn_momo: 'MTN MoMo', card: 'Carte' }
-
 export default function VendorOrdersPage() {
   const [filter, setFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const { data: config } = useSiteConfig()
   const { data, isLoading } = useQuery({
-    queryKey: ['vendor-orders', filter],
+    queryKey: ['vendor-orders', filter, page],
     queryFn: async () =>
-      (await api.get<Paginated<VendorSideOrder>>('/vendor/orders/', { params: filter ? { status: filter } : {} })).data,
+      (await api.get<Paginated<VendorSideOrder>>('/vendor/orders/', { params: { page, ...(filter ? { status: filter } : {}) } })).data,
+    placeholderData: keepPreviousData,
   })
+  // Filtres = statuts définis côté serveur
+  const filters = [{ value: '', label: 'Toutes' }, ...(config?.choices.vendor_order_status ?? [])]
 
   return (
     <div className="space-y-4">
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
-        {FILTERS.map((f) => (
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+        {filters.map((f) => (
           <button
             key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-sm ${filter === f.value ? 'bg-primary font-semibold' : 'bg-surface ring-1 ring-ink/10'}`}
+            onClick={() => {
+              setFilter(f.value)
+              setPage(1)
+            }}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${filter === f.value ? 'bg-ink text-white' : 'bg-surface shadow-sm hover:bg-ink/5'}`}
           >
             {f.label}
           </button>
@@ -53,7 +41,10 @@ export default function VendorOrdersPage() {
       ) : !data?.results.length ? (
         <Empty icon={<ShoppingBag />} title="Aucune commande ici" />
       ) : (
-        data.results.map((order) => <VendorOrderCard key={order.id} order={order} />)
+        <>
+          {data.results.map((order) => <VendorOrderCard key={order.id} order={order} />)}
+          <Pager page={data.page} totalPages={data.total_pages} onChange={setPage} />
+        </>
       )}
     </div>
   )
@@ -61,6 +52,9 @@ export default function VendorOrdersPage() {
 
 function VendorOrderCard({ order }: { order: VendorSideOrder }) {
   const queryClient = useQueryClient()
+  const { data: config } = useSiteConfig()
+  const actionLabel = (status: VendorOrderStatus) =>
+    config?.choices.vendor_order_status.find((c) => c.value === status)?.action ?? status
   const [error, setError] = useState<string | null>(null)
   const update = useMutation({
     mutationFn: (status: VendorOrderStatus) => api.post(`/vendor/orders/${order.id}/status/`, { status }),
@@ -71,7 +65,7 @@ function VendorOrderCard({ order }: { order: VendorSideOrder }) {
   const mapLink = d.latitude && d.longitude ? `https://www.google.com/maps?q=${d.latitude},${d.longitude}` : null
 
   return (
-    <article className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-ink/5">
+    <article className="card space-y-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold">
@@ -96,7 +90,7 @@ function VendorOrderCard({ order }: { order: VendorSideOrder }) {
         )}
         <li className="flex justify-between text-ink/60"><span>Livraison</span><span>{formatGNF(order.delivery_fee)}</span></li>
         <li className="mt-1 flex justify-between border-t border-ink/10 pt-1 font-semibold">
-          <span>Payé par le client · {PAYMENT_LABELS[order.payment_method]}</span>
+          <span>Payé par le client · {order.payment_method_label}</span>
           <span>{formatGNF(order.total_amount)}</span>
         </li>
         <li className="flex justify-between text-ink/60">
@@ -116,7 +110,7 @@ function VendorOrderCard({ order }: { order: VendorSideOrder }) {
         <p className="flex items-center gap-2 text-sm"><Bike className="size-4 text-primary-dark" /> {order.tracking.status_label} · {order.tracking.rider_name} {order.tracking.rider_phone}</p>
       )}
 
-      <div className="space-y-1 rounded-xl bg-background p-3 text-sm">
+      <div className="space-y-1 rounded-2xl bg-background p-4 text-sm">
         <p className="flex items-start gap-2">
           <MapPin className="mt-0.5 size-4 shrink-0 text-primary-dark" />
           <span>
@@ -145,7 +139,7 @@ function VendorOrderCard({ order }: { order: VendorSideOrder }) {
               loading={update.isPending && update.variables === status}
               onClick={() => (status !== 'cancelled' || window.confirm('Annuler cette commande ? Le stock sera remis.')) && update.mutate(status)}
             >
-              {ACTIONS[status]}
+              {actionLabel(status)}
             </Button>
           ))}
         </div>

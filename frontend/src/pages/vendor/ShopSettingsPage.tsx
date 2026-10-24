@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 
 import { ShopAvatar } from '../../components/Statuts'
 import { Button, ErrorBox, Input, Select, Textarea } from '../../components/ui'
+import { useSiteConfig } from '../../context/settings'
 import { api, errorMessage, formatDate } from '../../lib/api'
 import type { MyShop } from '../../lib/types'
 import { useMyShop } from './useMyShop'
@@ -30,7 +31,9 @@ interface VerificationRequest {
 
 function VerificationForm() {
   const queryClient = useQueryClient()
-  const [type, setType] = useState('id_card')
+  const { data: config } = useSiteConfig()
+  const [chosenType, setType] = useState<string | null>(null)
+  const type = chosenType ?? config?.choices.document_type[0]?.value ?? ''
   const [number, setNumber] = useState('')
   const [files, setFiles] = useState<Record<string, File | null>>({ document_front: null, document_back: null, shop_photo: null })
   const [error, setError] = useState<string | null>(null)
@@ -67,17 +70,15 @@ function VerificationForm() {
         setError(null)
         send.mutate()
       }}
-      className="h-fit space-y-3 rounded-2xl bg-surface p-5 ring-1 ring-ink/5"
+      className="h-fit space-y-3 card p-6"
     >
       <h2 className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-5 text-primary-dark" /> Badge « Vendeur vérifié »</h2>
-      <p className="text-sm text-ink/70">Vos documents sont vus uniquement par l'équipe GuinéeMall et ne sont jamais affichés.</p>
+      <p className="text-sm text-ink/70">Vos documents sont vus uniquement par l'équipe {config?.site.name} et ne sont jamais affichés.</p>
       {last?.status === 'rejected' && (
         <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Demande précédente refusée{last.admin_note ? ` : ${last.admin_note}` : '.'}</p>
       )}
       <Select label="Document" value={type} onChange={(e) => setType(e.target.value)}>
-        <option value="id_card">Carte d'identité</option>
-        <option value="passport">Passeport</option>
-        <option value="rccm">Registre du commerce (RCCM)</option>
+        {config?.choices.document_type.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
       </Select>
       <Input label="Numéro du document" value={number} onChange={(e) => setNumber(e.target.value)} required />
       {[
@@ -129,7 +130,7 @@ function ShopSettingsForm({ shop }: { shop: MyShop }) {
   }
 
   return (
-    <form onSubmit={submit} className="h-fit space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-ink/5">
+    <form onSubmit={submit} className="h-fit space-y-4 card p-6">
       <div className="flex items-center gap-4">
         <ShopAvatar logo={logoPreview ?? shop.logo} name={shop.shop_name} className="size-20" />
         <label className="cursor-pointer text-sm font-medium text-primary-dark hover:underline">

@@ -23,7 +23,7 @@ export default function ChatPage({ base }: { base: string }) {
   if (isLoading) return <Spinner />
 
   return (
-    <div className="grid h-[calc(100dvh-14rem)] min-h-96 overflow-hidden rounded-2xl bg-surface ring-1 ring-ink/5 md:h-[calc(100dvh-10rem)] md:grid-cols-[320px_1fr]">
+    <div className="grid h-[calc(100dvh-14rem)] min-h-96 overflow-hidden card md:h-[calc(100dvh-10rem)] md:grid-cols-[320px_1fr]">
       <aside className={`overflow-y-auto border-r border-ink/5 ${id ? 'hidden md:block' : ''}`}>
         <h1 className="border-b border-ink/5 px-4 py-3 text-lg font-bold">Messages</h1>
         {!conversations?.length ? (
