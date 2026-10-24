@@ -1,16 +1,27 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bike, Lock, MapPin, Phone, ShoppingBag, Store } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 import { Button, Empty, ErrorBox, Pager, Spinner, StatusBadge } from '../../components/ui'
 import { useSiteConfig } from '../../context/settings'
+import { useToast } from '../../context/toast'
 import { api, errorMessage, formatDate, formatGNF } from '../../lib/api'
 import type { Paginated, VendorOrderStatus, VendorSideOrder } from '../../lib/types'
 
 export default function VendorOrdersPage() {
-  const [filter, setFilter] = useState('')
+  // Onglet dans l'adresse (?statut=pending) : on peut y arriver directement depuis un lien
+  const [params, setParams] = useSearchParams()
+  const filter = params.get('statut') ?? ''
   const [page, setPage] = useState(1)
+  const [highlight, setHighlight] = useState<number | null>(null)
   const { data: config } = useSiteConfig()
+
+  function openTab(status: string, orderId: number | null = null) {
+    setParams(status ? { statut: status } : {}, { replace: true })
+    setPage(1)
+    setHighlight(orderId)
+  }
   const { data, isLoading } = useQuery({
     queryKey: ['vendor-orders', filter, page],
     queryFn: async () =>
@@ -26,10 +37,7 @@ export default function VendorOrdersPage() {
         {filters.map((f) => (
           <button
             key={f.value}
-            onClick={() => {
-              setFilter(f.value)
-              setPage(1)
-            }}
+            onClick={() => openTab(f.value)}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${filter === f.value ? 'bg-ink text-white' : 'bg-surface shadow-sm hover:bg-ink/5'}`}
           >
             {f.label}
@@ -42,7 +50,15 @@ export default function VendorOrdersPage() {
         <Empty icon={<ShoppingBag />} title="Aucune commande ici" />
       ) : (
         <>
-          {data.results.map((order) => <VendorOrderCard key={order.id} order={order} />)}
+          {data.results.map((order) => (
+            <VendorOrderCard
+              key={order.id}
+              order={order}
+              highlighted={order.id === highlight}
+              // Après une action, on ouvre l'onglet du nouveau statut avec la commande en évidence
+              onMoved={(status) => openTab(status, order.id)}
+            />
+          ))}
           <Pager page={data.page} totalPages={data.total_pages} onChange={setPage} />
         </>
       )}
@@ -50,7 +66,17 @@ export default function VendorOrdersPage() {
   )
 }
 
-function VendorOrderCard({ order }: { order: VendorSideOrder }) {
+function VendorOrderCard({
+  order,
+  highlighted,
+  onMoved,
+}: {
+  order: VendorSideOrder
+  highlighted: boolean
+  onMoved: (status: VendorOrderStatus) => void
+}) {
+  const toast = useToast()
+  const ref = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
   const { data: config } = useSiteConfig()
   const actionLabel = (status: VendorOrderStatus) =>
@@ -58,14 +84,23 @@ function VendorOrderCard({ order }: { order: VendorSideOrder }) {
   const [error, setError] = useState<string | null>(null)
   const update = useMutation({
     mutationFn: (status: VendorOrderStatus) => api.post(`/vendor/orders/${order.id}/status/`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['vendor-orders'] }),
+    onSuccess: (_, status) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-orders'] })
+      const label = config?.choices.vendor_order_status.find((c) => c.value === status)?.label ?? status
+      toast(`Commande #${order.order_id} : ${label}`)
+      onMoved(status)
+    },
     onError: (e) => setError(errorMessage(e)),
   })
+  useEffect(() => {
+    if (highlighted) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlighted])
+
   const d = order.delivery
   const mapLink = d.latitude && d.longitude ? `https://www.google.com/maps?q=${d.latitude},${d.longitude}` : null
 
   return (
-    <article className="card space-y-4 p-5">
+    <article ref={ref} className={`card space-y-4 p-5 transition ${highlighted ? 'ring-2 ring-primary-dark' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold">

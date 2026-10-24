@@ -31,7 +31,7 @@ export default function VendorDashboard() {
   return (
     <div className="space-y-6">
       {(pending?.count ?? 0) > 0 && (
-        <Link to="/vendeur/commandes" className="flex items-center gap-3 rounded-2xl bg-primary p-4 font-semibold">
+        <Link to="/vendeur/commandes?statut=pending" className="flex items-center gap-3 rounded-2xl bg-primary p-4 font-semibold">
           <ShoppingBag className="size-6" /> {pending!.count} commande(s) à confirmer →
         </Link>
       )}

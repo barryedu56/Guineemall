@@ -18,7 +18,7 @@ def accept(delivery, rider):
     delivery.save(update_fields=["rider", "status", "updated_at"])
     vo = delivery.vendor_order
     notify(vo.vendor.user, "delivery", f"Livreur en route – commande #{vo.order_id}",
-           f"{rider.user.name} ({rider.user.phone}) vient récupérer le colis.", "/vendeur/commandes")
+           f"{rider.user.name} ({rider.user.phone}) vient récupérer le colis.", "/vendeur/commandes?statut=ready")
     return delivery
 
 

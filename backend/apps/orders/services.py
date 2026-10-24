@@ -241,7 +241,7 @@ def announce_order(order):
            "Les boutiques vont la confirmer et vous appeler pour la livraison.", f"/commandes/{order.id}")
     for vo in order.vendor_orders.select_related("vendor__user"):
         notify(vo.vendor.user, "order", f"Nouvelle commande #{order.id} 🛍️",
-               f"{vo.items.count()} article(s) – {vo.total_amount} GNF. Confirmez-la rapidement.", "/vendeur/commandes")
+               f"{vo.items.count()} article(s) – {vo.total_amount} GNF. Confirmez-la rapidement.", "/vendeur/commandes?statut=pending")
 
 
 @transaction.atomic
@@ -330,7 +330,7 @@ def cancel_order(order, user):
         _restore_stock(vendor_order)
         if is_visible_to_vendor(order):
             notify(vendor_order.vendor.user, "order", f"Commande #{order.id} annulée",
-                   "Le client a annulé sa commande.", "/vendeur/commandes", whatsapp=False)
+                   "Le client a annulé sa commande.", "/vendeur/commandes?statut=cancelled", whatsapp=False)
 
     _flag_refund(order)
     _sync_order_status(order, user)
