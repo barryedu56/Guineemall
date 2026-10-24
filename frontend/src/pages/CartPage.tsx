@@ -2,10 +2,11 @@ import { ImageOff, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
+import Price from '../components/Price'
 import { Button, Empty, ErrorBox, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
-import { errorMessage, formatGNF } from '../lib/api'
+import { errorMessage } from '../lib/api'
 import type { CartLine } from '../lib/types'
 
 export default function CartPage() {
@@ -64,7 +65,7 @@ export default function CartPage() {
                     <Link to={`/produit/${line.product.slug}`} className="font-medium hover:underline">
                       {line.product.name}
                     </Link>
-                    <span className="text-sm text-ink/60">{formatGNF(line.product.price)}</span>
+                    <span className="text-sm text-ink/60"><Price amount={line.product.price} /></span>
                     <div className="mt-auto flex items-center justify-between pt-2">
                       <div className="flex items-center rounded-lg ring-1 ring-ink/15">
                         <button
@@ -85,7 +86,7 @@ export default function CartPage() {
                           <Plus className="size-4" />
                         </button>
                       </div>
-                      <span className="font-semibold">{formatGNF(line.subtotal)}</span>
+                      <span className="font-semibold"><Price amount={line.subtotal} /></span>
                       <button onClick={() => run(() => remove(line))} className="p-1.5 text-ink/40 hover:text-red-600" aria-label="Retirer">
                         <Trash2 className="size-5" />
                       </button>
@@ -101,9 +102,9 @@ export default function CartPage() {
       <aside className="h-fit space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-ink/5 lg:sticky lg:top-24">
         <div className="flex justify-between text-lg">
           <span>Total</span>
-          <span className="font-bold">{formatGNF(total)}</span>
+          <span className="font-bold"><Price amount={total} /></span>
         </div>
-        <p className="text-sm text-ink/60">Les frais de livraison seront ajoutés prochainement selon votre commune.</p>
+        <p className="text-sm text-ink/60">Livraison selon votre commune ou retrait en point relais, calculés à l’étape suivante.</p>
         <Button className="w-full" onClick={() => navigate(user ? '/commande' : '/connexion?suivant=/commande')}>
           {user ? 'Passer la commande' : 'Se connecter pour commander'}
         </Button>
