@@ -11,6 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from apps.accounts.models import User
+from apps.core.audit import audit
 from apps.delivery.models import Delivery, Rider
 from apps.orders.models import Order, VendorOrder
 from apps.vendors.models import Vendor, VerificationRequest
@@ -18,9 +19,13 @@ from apps.wallet.models import CashDeposit, PayoutRequest
 
 
 class IsPlatformAdmin(permissions.BasePermission):
+    """Équipe uniquement, et seulement avec la double authentification activée."""
+
+    message = "Activez la double authentification pour accéder à l'administration."
+
     def has_permission(self, request, view):
         user = request.user
-        return user.is_authenticated and (user.is_staff or user.role == User.Role.ADMIN)
+        return user.is_authenticated and user.is_team and user.has_2fa
 
 
 @api_view(["POST"])
@@ -30,7 +35,9 @@ def open_admin_session(request):
     if not request.user.is_staff:
         return Response({"detail": "Ce compte n'a pas accès à l'administration Django."}, status=status.HTTP_403_FORBIDDEN)
     login(request, request.user, backend="django.contrib.auth.backends.ModelBackend")
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    audit(request, "admin.session_opened", request.user)
+    # L'adresse (secrète) de l'admin n'est donnée qu'ici, à un membre de l'équipe authentifié
+    return Response({"admin_url": f"/{settings.ADMIN_URL}"})
 
 
 def _money(queryset, field):

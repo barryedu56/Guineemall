@@ -82,6 +82,7 @@ def with_details(queryset):
 class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Commandes du client. POST /orders/ = passer commande avec le panier."""
 
+    throttle_scope = None  # limite propre à certaines actions (devis)
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
     filterset_fields = ["status"]
@@ -98,7 +99,7 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
             raise ValidationError({"detail": str(e)})
         return Response(self.get_serializer(self.get_queryset().get(pk=order.pk)).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["post"], throttle_scope="quote")
     def quote(self, request):
         """Détail du prix (articles, livraison, réduction) avant de confirmer."""
         payload = QuoteSerializer(data=request.data, context={"request": request})

@@ -67,7 +67,8 @@ class PasswordTests(GuineeMallTestCase):
         bad = self.client.post("/api/auth/password/change/", {"current_password": "faux", "new_password": "Nouveau2026!!"})
         self.assertEqual(bad.status_code, 400)
         ok = self.client.post("/api/auth/password/change/", {"current_password": "MotDePasse123!", "new_password": "Nouveau2026!!"})
-        self.assertEqual(ok.status_code, 204)
+        self.assertEqual(ok.status_code, 200)
+        self.assertIn("refresh", ok.data)
 
 
 class ConfigTests(GuineeMallTestCase):
@@ -107,3 +108,30 @@ class PhoneTests(GuineeMallTestCase):
         self.client.force_authenticate(self.make_client())
         r = self.client.post("/api/auth/addresses/", {"landmark": "Marché", "contact_phone": "62000000000"})
         self.assertEqual(r.status_code, 400)
+
+
+class SessionTests(GuineeMallTestCase):
+    def login(self):
+        return self.client.post("/api/auth/token/", {"email": "s@test.gn", "password": "MotDePasse123!"}).data
+
+    def test_deconnexion_revoque_le_jeton(self):
+        self.make_client("s@test.gn")
+        tokens = self.login()
+        self.client.post("/api/auth/logout/", {"refresh": tokens["refresh"]})
+        r = self.client.post("/api/auth/token/refresh/", {"refresh": tokens["refresh"]})
+        self.assertEqual(r.status_code, 401)
+
+    def test_changer_de_mot_de_passe_deconnecte_les_autres_appareils(self):
+        user = self.make_client("s@test.gn")
+        telephone_vole = self.login()
+        self.client.force_authenticate(user)
+        self.client.post("/api/auth/password/change/", {"current_password": "MotDePasse123!", "new_password": "Nouveau2026!!"})
+        self.client.force_authenticate(None)
+        r = self.client.post("/api/auth/token/refresh/", {"refresh": telephone_vole["refresh"]})
+        self.assertEqual(r.status_code, 401)
+
+    def test_ancien_jeton_de_renouvellement_inutilisable_apres_rotation(self):
+        self.make_client("s@test.gn")
+        tokens = self.login()
+        self.assertEqual(self.client.post("/api/auth/token/refresh/", {"refresh": tokens["refresh"]}).status_code, 200)
+        self.assertEqual(self.client.post("/api/auth/token/refresh/", {"refresh": tokens["refresh"]}).status_code, 401)

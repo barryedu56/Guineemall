@@ -25,7 +25,7 @@ export interface RiderRegisterData extends RegisterData {
 export interface AuthContextValue {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<User>
+  login: (email: string, password: string, otp?: string) => Promise<User>
   register: (data: RegisterData) => Promise<User>
   registerVendor: (data: VendorRegisterData) => Promise<User>
   registerRider: (data: RiderRegisterData) => Promise<User>

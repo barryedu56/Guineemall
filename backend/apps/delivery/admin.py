@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from apps.core.audit import audit
 from apps.notifications.services import notify
 
 from .models import Delivery, DeliveryRating, DeliveryZone, PickupPoint, Rider
@@ -44,6 +45,7 @@ class RiderAdmin(admin.ModelAdmin):
         for rider in queryset.filter(is_approved=False):
             rider.is_approved = True
             rider.save(update_fields=["is_approved", "updated_at"])
+            audit(request, "rider.approved", rider)
             notify(rider.user, "delivery", "Compte livreur validé ✅", "Vous pouvez accepter des courses.", "/livreur")
 
 

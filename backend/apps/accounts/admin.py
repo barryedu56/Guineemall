@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Address, AdminLog, User
+from .models import Address, User
 
 
 @admin.register(User)
@@ -25,8 +25,3 @@ class UserAdmin(BaseUserAdmin):
 class AddressAdmin(admin.ModelAdmin):
     list_display = ["user", "label", "city", "commune", "quartier", "is_default"]
     list_filter = ["city", "commune"]
-
-
-@admin.register(AdminLog)
-class AdminLogAdmin(admin.ModelAdmin):
-    list_display = ["admin", "action", "created_at"]

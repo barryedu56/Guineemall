@@ -40,3 +40,13 @@ def notify(user, kind, title, body="", link="", whatsapp=True):
 
     transaction.on_commit(deliver)
     return notification
+
+
+def notify_team(title, body="", link="/administration"):
+    """Alerte tous les membres de l'équipe (dans le site, sans WhatsApp)."""
+    from django.db.models import Q
+
+    from apps.accounts.models import User
+
+    for member in User.objects.filter(Q(is_staff=True) | Q(role=User.Role.ADMIN), is_active=True):
+        notify(member, "shop", title, body, link, whatsapp=False)

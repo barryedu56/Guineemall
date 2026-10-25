@@ -5,6 +5,7 @@ import {
 import type { ReactNode } from 'react'
 
 import Price from '../components/Price'
+import TwoFactor from '../components/TwoFactor'
 import { PageHeader, Skeleton, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useToast } from '../context/toast'
@@ -29,14 +30,17 @@ interface Dashboard {
   top_shops: { shop_name: string; slug: string; revenue: number }[]
 }
 
-/** Ouvre une page de l'admin Django sans redemander le mot de passe. */
+/** Ouvre une page de l'admin Django sans redemander le mot de passe (adresse secrète fournie par le serveur). */
 function useOpenAdmin() {
   const toast = useToast()
   return async (path: string) => {
+    // Onglet ouvert tout de suite (sinon bloqué par le navigateur), puis dirigé vers l'admin
+    const tab = window.open('about:blank', '_blank')
     try {
-      await api.post('/admin/session/')
-      window.open(`/admin/${path}`, '_blank', 'noopener')
+      const { data } = await api.post<{ admin_url: string }>('/admin/session/')
+      if (tab) tab.location.href = `${data.admin_url}${path}`
     } catch (e) {
+      tab?.close()
       toast(errorMessage(e), 'error')
     }
   }
@@ -45,11 +49,22 @@ function useOpenAdmin() {
 export default function AdminDashboard() {
   const { user } = useAuth()
   const openAdmin = useOpenAdmin()
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: async () => (await api.get<Dashboard>('/admin/dashboard/')).data,
     refetchInterval: 60_000,
+    retry: false,
   })
+
+  // L'administration exige la double authentification : on la fait activer d'abord
+  if (!user?.has_2fa || (error && (error as { response?: { status?: number } }).response?.status === 403)) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <PageHeader title="Sécurisez votre compte" subtitle="L'administration donne accès à l'argent de la plateforme : la double authentification est obligatoire." />
+        <TwoFactor onEnabled={() => refetch()} />
+      </div>
+    )
+  }
 
   if (isLoading || !data) {
     return <div className="grid gap-4 sm:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-28" />)}</div>

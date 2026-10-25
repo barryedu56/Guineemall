@@ -9,6 +9,7 @@ from .models import Conversation
 @override_settings(MEDIA_ROOT="/tmp/claude-1000/guineemall-test-media")
 class ChatTests(GuineeMallTestCase):
     def setUp(self):
+        super().setUp()
         self.vendor = self.make_vendor("Kipé")
         self.product = self.make_product(self.vendor)
         self.user = self.make_client()

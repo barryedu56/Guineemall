@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.models import TimeStampedModel, unique_slug
+from apps.core.uploads import validate_image_5mb
 
 
 class Coupon(TimeStampedModel):
@@ -67,7 +68,7 @@ class Campaign(TimeStampedModel):
     name = models.CharField("nom", max_length=150)
     slug = models.SlugField(max_length=160, unique=True, blank=True)
     description = models.TextField(blank=True)
-    banner = models.ImageField(upload_to="campaigns/", blank=True)
+    banner = models.ImageField(upload_to="campaigns/", blank=True, validators=[validate_image_5mb])
     color = models.CharField("couleur", max_length=7, default="#FFC107")
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()

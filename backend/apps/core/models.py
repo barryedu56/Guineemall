@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
 from .phone import PhoneField
+from .uploads import validate_image_5mb
 
 
 class TimeStampedModel(models.Model):
@@ -73,7 +75,7 @@ class SiteSettings(models.Model):
         "texte de l'accueil",
         default="Achetez auprès de boutiques de Conakry et de toute la Guinée. Payez par Orange Money, MTN ou à la livraison.",
     )
-    hero_image = models.ImageField("image de l'accueil", upload_to="site/", blank=True)
+    hero_image = models.ImageField("image de l'accueil", upload_to="site/", blank=True, validators=[validate_image_5mb])
     contact_phone = PhoneField("téléphone", blank=True)
     contact_whatsapp = PhoneField("WhatsApp du service client", blank=True)
     contact_email = models.EmailField("email", blank=True)
@@ -120,3 +122,27 @@ class SiteSettings(models.Model):
                 ("card", self.enable_card),
             ) if enabled
         ]
+
+
+class AuditLog(models.Model):
+    """
+    Journal des actions sensibles (argent, validations, accès aux pièces d'identité, sécurité).
+    En lecture seule : une ligne ne se modifie ni ne se supprime depuis l'admin.
+    """
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    action = models.CharField(max_length=60, db_index=True)
+    target = models.CharField("objet concerné", max_length=200, blank=True)
+    data = models.JSONField(default=dict, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "journal d'audit"
+        verbose_name_plural = "journal d'audit"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.created_at:%d/%m/%Y %H:%M} {self.action} {self.target}"

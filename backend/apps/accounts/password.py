@@ -10,7 +10,10 @@ from rest_framework import permissions, serializers, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.core.audit import audit
 from apps.core.models import SiteSettings
 
 from .models import User
@@ -66,6 +69,8 @@ def confirm_reset(request):
     user = serializer.validated_data["user"]
     user.set_password(serializer.validated_data["password"])
     user.save(update_fields=["password"])
+    revoke_all_sessions(user)
+    audit(request, "auth.password_reset", user)
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -83,4 +88,27 @@ def change_password(request):
         raise serializers.ValidationError({"current_password": "Mot de passe actuel incorrect."})
     request.user.set_password(serializer.validated_data["new_password"])
     request.user.save(update_fields=["password"])
+    revoke_all_sessions(request.user)
+    audit(request, "auth.password_changed", request.user)
+    # L'appareil actuel reçoit de nouveaux jetons ; tous les autres sont déconnectés
+    refresh = RefreshToken.for_user(request.user)
+    return Response({"access": str(refresh.access_token), "refresh": str(refresh)})
+
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def logout(request):
+    """Révoque le jeton de renouvellement : il ne pourra plus servir, même s'il a été volé."""
+    try:
+        RefreshToken(str(request.data.get("refresh", ""))).blacklist()
+    except TokenError:
+        pass
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def revoke_all_sessions(user):
+    """Déconnecte l'utilisateur de tous ses appareils (jetons de renouvellement révoqués)."""
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    for token in OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False):
+        BlacklistedToken.objects.get_or_create(token=token)

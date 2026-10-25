@@ -18,7 +18,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.formatting import gnf
-from apps.notifications.services import notify
+from apps.core.audit import audit
+from apps.notifications.services import notify, notify_team
 
 from .models import CashDeposit, LedgerEntry, PayoutRequest
 
@@ -89,7 +90,10 @@ def request_payout(user, amount, method, phone):
         raise ValueError("Le montant doit être positif.")
     if amount > balance - pending:
         raise ValueError(f"Solde disponible insuffisant ({gnf(max(0, balance - pending))}).")
-    return PayoutRequest.objects.create(user=user, amount=amount, method=method, phone=phone)
+    payout = PayoutRequest.objects.create(user=user, amount=amount, method=method, phone=phone)
+    audit(user, "payout.requested", payout, {"amount": amount, "method": method})
+    notify_team("Demande de retrait à traiter", f"{user.name} : {gnf(amount)} vers {payout.get_method_display()}.")
+    return payout
 
 
 @transaction.atomic
@@ -103,6 +107,8 @@ def process_payout(payout, admin, paid, reference="", note=""):
     payout.processed_by = admin
     payout.processed_at = timezone.now()
     payout.save()
+    audit(admin, "payout.paid" if paid else "payout.rejected", payout,
+          {"amount": payout.amount, "reference": reference, "note": note})
     if paid:
         LedgerEntry.objects.create(
             user=payout.user, kind=LedgerEntry.Kind.PAYOUT, amount=-payout.amount, payout=payout,
@@ -124,7 +130,10 @@ def declare_deposit(user, amount, method, reference):
         raise ValueError("Le montant doit être positif.")
     if amount > debt - pending:
         raise ValueError(f"Vous ne devez que {gnf(max(0, debt - pending))} (versements en attente déduits).")
-    return CashDeposit.objects.create(user=user, amount=amount, method=method, reference=reference)
+    deposit = CashDeposit.objects.create(user=user, amount=amount, method=method, reference=reference)
+    audit(user, "deposit.declared", deposit, {"amount": amount, "method": method, "reference": reference})
+    notify_team("Versement d'espèces à vérifier", f"{user.name} : {gnf(amount)} ({deposit.get_method_display()}, réf. {reference}).")
+    return deposit
 
 
 @transaction.atomic
@@ -137,6 +146,7 @@ def process_deposit(deposit, admin, confirmed, note=""):
     deposit.processed_by = admin
     deposit.processed_at = timezone.now()
     deposit.save()
+    audit(admin, "deposit.confirmed" if confirmed else "deposit.rejected", deposit, {"amount": deposit.amount, "note": note})
     if confirmed:
         LedgerEntry.objects.create(
             user=deposit.user, kind=LedgerEntry.Kind.CASH_DEPOSIT, amount=deposit.amount, deposit=deposit,

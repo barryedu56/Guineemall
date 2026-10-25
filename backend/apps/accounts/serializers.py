@@ -1,6 +1,8 @@
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.vendors.models import Vendor
@@ -10,11 +12,12 @@ from .models import Address, User
 
 class UserSerializer(serializers.ModelSerializer):
     shop = serializers.SerializerMethodField()
+    has_2fa = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "email", "name", "phone", "role", "avatar", "referral_code", "shop", "date_joined"]
-        read_only_fields = ["id", "email", "role", "referral_code", "date_joined"]
+        fields = ["id", "email", "name", "phone", "role", "avatar", "referral_code", "has_2fa", "shop", "date_joined"]
+        read_only_fields = ["id", "email", "role", "referral_code", "has_2fa", "date_joined"]
 
     def get_shop(self, user):
         vendor = getattr(user, "vendor", None)
@@ -97,3 +100,33 @@ class AddressSerializer(serializers.ModelSerializer):
         if address.is_default:
             address.user.addresses.exclude(pk=address.pk).update(is_default=False)
         return address
+
+
+class LoginSerializer(TokenObtainPairSerializer):
+    """
+    Connexion : si le compte a la double authentification, le code à 6 chiffres est exigé.
+    Réponse sans code : 401 avec code « otp_required », pour que le site affiche le champ.
+    """
+
+    otp = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    def validate(self, attrs):
+        otp = attrs.pop("otp", "")
+        data = super().validate(attrs)
+        user = self.user
+        if user.has_2fa:
+            from .two_factor import verify
+
+            if not otp:
+                # « code » dans le corps : le site affiche alors le champ du code à 6 chiffres
+                raise AuthenticationFailed({"detail": "Saisissez le code de votre application d'authentification.", "code": "otp_required"})
+            if not verify(user, otp):
+                audit_failed(self.context.get("request"), user)
+                raise AuthenticationFailed({"detail": "Code de double authentification incorrect.", "code": "otp_invalid"})
+        return data
+
+
+def audit_failed(request, user):
+    from apps.core.audit import audit
+
+    audit(request, "auth.2fa_failed", user)

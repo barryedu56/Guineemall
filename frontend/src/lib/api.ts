@@ -77,6 +77,7 @@ export function formatPhone(phone: string | null | undefined) {
 /** Extrait un message lisible d'une erreur de l'API Django REST Framework. */
 export function errorMessage(error: unknown): string {
   if (error instanceof AxiosError) {
+    if (error.response?.status === 429) return 'Trop de tentatives. Patientez quelques minutes avant de réessayer.'
     const data = error.response?.data
     if (typeof data === 'string') return 'Erreur du serveur, réessayez.'
     if (data && typeof data === 'object') {
@@ -103,4 +104,13 @@ export function timeAgo(iso: string) {
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `il y a ${hours} h`
   return `il y a ${Math.floor(hours / 24)} j`
+}
+
+/** Code d'erreur métier renvoyé par l'API (ex. « otp_required »). */
+export function errorCode(error: unknown): string | null {
+  if (error instanceof AxiosError) {
+    const data = error.response?.data
+    if (data && typeof data === 'object' && 'code' in data) return String((data as { code: unknown }).code)
+  }
+  return null
 }

@@ -66,6 +66,13 @@ def check_delivery_code(vendor_order, code):
     if not vendor_order.delivery_code or not hmac.compare_digest(vendor_order.delivery_code, str(code or "").strip()):
         VendorOrder.objects.filter(pk=vendor_order.pk).update(delivery_code_attempts=F("delivery_code_attempts") + 1)
         left = settings.DELIVERY_CODE_MAX_ATTEMPTS - vendor_order.delivery_code_attempts - 1
+        if left <= 0:
+            from apps.notifications.services import notify_team
+
+            notify_team(
+                f"Code de livraison bloqué – commande #{vendor_order.order_id}",
+                f"{settings.DELIVERY_CODE_MAX_ATTEMPTS} codes faux saisis ({vendor_order.vendor}). Vérifiez avant de débloquer.",
+            )
         raise OrderError(
             "Code de livraison incorrect. Demandez au client le code reçu par notification"
             + (f" ({left} essai(s) restant(s))." if left > 0 else ". La livraison est maintenant bloquée.")

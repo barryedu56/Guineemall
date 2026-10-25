@@ -1,4 +1,7 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+
+from apps.core.uploads import check_upload
 
 from .models import Conversation, Message
 
@@ -23,14 +26,11 @@ class MessageSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Message vide.")
         attachment = attrs.get("attachment")
         if attachment:
-            content_type = getattr(attachment, "content_type", "")
-            if attachment.size > 15 * 1024 * 1024:
-                raise serializers.ValidationError({"attachment": "Fichier trop lourd (15 Mo maximum)."})
-            attrs["type"] = (
-                Message.Type.IMAGE if content_type.startswith("image/")
-                else Message.Type.VOICE if content_type.startswith("audio/")
-                else Message.Type.FILE
-            )
+            try:
+                family = check_upload(attachment, {"image", "audio", "pdf"}, max_mb=15)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({"attachment": e.messages[0]})
+            attrs["type"] = {"image": Message.Type.IMAGE, "pdf": Message.Type.FILE}.get(family, Message.Type.VOICE)
         else:
             attrs["type"] = Message.Type.TEXT
         return attrs

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     # Tiers
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
     "channels",
@@ -114,6 +115,9 @@ CHANNEL_LAYERS = {
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Adresse de l'admin Django : à rendre difficile à deviner en production (ex. « gestion-7f3k2/ »)
+ADMIN_URL = env("ADMIN_URL", default="admin/")
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -132,6 +136,8 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Documents sensibles (pièces d'identité) : jamais servis publiquement
+PRIVATE_MEDIA_ROOT = env("PRIVATE_MEDIA_ROOT", default=str(BASE_DIR / "private_media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -149,12 +155,31 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ],
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.Pagination",
+    # Limitation des tentatives (voir apps/core/throttling.py)
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "120/min",
+        "user": "600/min",
+        "login_ip": "20/min",
+        "login_account": "10/hour",
+        "register": "10/hour",
+        "quote": "30/min",
+        "money": "20/hour",
+        "messages": "60/min",
+        "reviews": "10/hour",
+    },
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    # Jeton d'accès court ; le jeton de renouvellement change à chaque usage et l'ancien est révoqué
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
     "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
 }
 
@@ -230,3 +255,24 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="GuinéeMall <no-reply@guineemall.gn>")
+
+# ---------------------------------------------------------------- Sécurité HTTP
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = 8 * 3600  # session de l'admin Django : 8 h
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
+if not DEBUG:
+    # Production : HTTPS obligatoire (derrière Nginx qui transmet X-Forwarded-Proto)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31_536_000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+# Liste « HSTS preload » des navigateurs : quasi irréversible, à décider une fois le domaine définitif en place
+SILENCED_SYSTEM_CHECKS = ["security.W021"]

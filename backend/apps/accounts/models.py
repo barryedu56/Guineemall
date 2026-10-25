@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+from apps.core.uploads import validate_image_5mb
 from apps.core.phone import PhoneField
 
 
@@ -56,12 +57,15 @@ class User(AbstractUser):
     email = models.EmailField("email", unique=True)
     phone = PhoneField("téléphone", blank=True)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.CLIENT)
-    avatar = models.ImageField(upload_to="avatars/", blank=True)
+    avatar = models.ImageField(upload_to="avatars/", blank=True, validators=[validate_image_5mb])
     # Parrainage et affiliation : le même code sert aux deux
     referral_code = models.CharField("code parrain", max_length=12, unique=True, blank=True)
     referred_by = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="referrals"
     )
+    # Double authentification (obligatoire pour l'équipe) : secret TOTP de l'application d'authentification
+    totp_secret = models.CharField(max_length=64, blank=True, editable=False)
+    totp_enabled_at = models.DateTimeField("double authentification activée le", null=True, blank=True, editable=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["name"]
@@ -78,6 +82,15 @@ class User(AbstractUser):
         if not self.referral_code:
             self.referral_code = generate_referral_code()
         super().save(*args, **kwargs)
+
+    @property
+    def is_team(self):
+        """Membre de l'équipe GuinéeMall (accès à l'administration)."""
+        return self.is_staff or self.role == self.Role.ADMIN
+
+    @property
+    def has_2fa(self):
+        return self.totp_enabled_at is not None
 
     @property
     def is_vendeur(self):
@@ -116,16 +129,3 @@ class Address(TimeStampedModel):
 
     def __str__(self):
         return f"{self.label} – {self.quartier or self.commune}, {self.city}"
-
-
-class AdminLog(models.Model):
-    admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name="admin_logs")
-    action = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "journal admin"
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.admin} : {self.action[:50]}"

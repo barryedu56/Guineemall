@@ -28,6 +28,7 @@ class ConversationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
     serializer_class = ConversationSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
+    throttle_scope = None  # limite propre à l'envoi de messages
 
     def get_queryset(self):
         user = self.request.user
@@ -58,7 +59,7 @@ class ConversationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
         return Response(self.get_serializer(self.get_queryset().get(pk=conversation.pk)).data)
 
     @action(
-        detail=True, methods=["get", "post"],
+        detail=True, methods=["get", "post"], throttle_scope="messages",
         parser_classes=[parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser],
     )
     def messages(self, request, pk=None):

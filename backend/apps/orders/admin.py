@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from apps.core.audit import audit
+
 from .models import CartItem, Order, OrderItem, OrderStatusHistory, VendorOrder
 
 
@@ -28,6 +30,8 @@ class VendorOrderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Débloquer le code de livraison (après vérification)")
     def unlock_code(self, request, queryset):
+        for vendor_order in queryset:
+            audit(request, "delivery_code.unlocked", vendor_order, {"attempts": vendor_order.delivery_code_attempts})
         queryset.update(delivery_code_attempts=0)
 
 

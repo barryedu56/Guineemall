@@ -55,6 +55,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
+    throttle_scope = None  # limite propre à certaines actions (avis)
     filterset_class = ProductFilter
     search_fields = ["name", "description", "vendor__shop_name", "category__name"]
     ordering_fields = ["price", "created_at"]
@@ -92,7 +93,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         stats.record_view(response.data["id"])
         return response
 
-    @action(detail=True, methods=["get", "post"], permission_classes=[permissions.IsAuthenticatedOrReadOnly],
+    @action(detail=True, methods=["get", "post"], permission_classes=[permissions.IsAuthenticatedOrReadOnly], throttle_scope="reviews",
             parser_classes=[parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser])
     def reviews(self, request, slug=None):
         """GET : avis du produit · POST : laisser un avis (uniquement après l'avoir reçu)."""

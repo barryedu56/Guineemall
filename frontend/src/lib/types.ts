@@ -19,6 +19,7 @@ export interface User {
   role: Role
   avatar: string | null
   referral_code: string
+  has_2fa: boolean
   shop: { id: number; slug: string; shop_name: string; status: VendorStatus } | null
 }
 

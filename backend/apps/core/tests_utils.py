@@ -1,5 +1,6 @@
 from io import BytesIO
 
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 from rest_framework.test import APITestCase
@@ -25,6 +26,10 @@ class GuineeMallTestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
         DeliveryZone.objects.create(city="Conakry", commune="Ratoma", fee=DELIVERY_FEE)
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()  # compteurs de limitation des tentatives
 
     def make_client(self, email="client@test.gn"):
         return User.objects.create_user(email=email, password="MotDePasse123!", name="Client Test", phone="620000001")

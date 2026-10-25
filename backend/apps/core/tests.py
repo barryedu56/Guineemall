@@ -1,6 +1,8 @@
+import pyotp
 from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase
+from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.accounts.models import User
@@ -53,9 +55,17 @@ class AdminDashboardTests(TransactionTestCase):
 
         admin = User.objects.create_superuser(email="a@test.gn", password="x", name="A")
         api.force_authenticate(admin)
+        # Sans double authentification : refusé
+        self.assertEqual(api.get("/api/admin/dashboard/").status_code, 403)
+        admin.totp_secret = pyotp.random_base32()
+        admin.totp_enabled_at = timezone.now()
+        admin.save()
         data = api.get("/api/admin/dashboard/").data
         self.assertEqual(data["totals"]["users"], 2)
         self.assertIn("vendors_pending", data["todo"])
 
-        self.assertEqual(api.post("/api/admin/session/").status_code, 204)
+        self.assertEqual(api.post("/api/admin/session/").data["admin_url"], "/admin/")
         self.assertEqual(api.get("/admin/").status_code, 200)  # admin Django accessible sans 2e connexion
+
+
+from .tests_security import BruteForceTests, TwoFactorTests, UploadAttackTests  # noqa: E402,F401

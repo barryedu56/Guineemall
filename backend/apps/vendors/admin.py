@@ -1,7 +1,9 @@
 from django.contrib import admin, messages
+from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html_join
 
+from apps.core.audit import audit
 from apps.notifications.services import notify
 
 from .models import Vendor, VerificationRequest
@@ -19,6 +21,7 @@ class VendorAdmin(admin.ModelAdmin):
         for vendor in queryset.exclude(status=Vendor.Status.APPROVED):
             vendor.status = Vendor.Status.APPROVED
             vendor.save(update_fields=["status", "updated_at"])
+            audit(request, "vendor.approved", vendor)
             notify(vendor.user, "shop", "Votre boutique est en ligne 🎉",
                    "Ajoutez vos produits et publiez votre premier statut.", "/vendeur")
         messages.success(request, "Boutiques approuvées.")
@@ -28,6 +31,7 @@ class VendorAdmin(admin.ModelAdmin):
         for vendor in queryset.exclude(status=Vendor.Status.SUSPENDED):
             vendor.status = Vendor.Status.SUSPENDED
             vendor.save(update_fields=["status", "updated_at"])
+            audit(request, "vendor.suspended", vendor)
             notify(vendor.user, "shop", "Boutique suspendue", "Contactez GuinéeMall pour en savoir plus.", "/vendeur")
 
 
@@ -40,10 +44,11 @@ class VerificationRequestAdmin(admin.ModelAdmin):
 
     @admin.display(description="Documents")
     def preview(self, obj):
-        images = [f for f in (obj.document_front, obj.document_back, obj.shop_photo) if f]
-        return format_html(
-            "".join('<a href="{}" target="_blank"><img src="{}" style="height:160px;margin-right:8px"></a>' for _ in images),
-            *[url for f in images for url in (f.url, f.url)],
+        # Servis par une vue réservée à l'équipe (stockage privé, pas d'adresse publique)
+        fields = [f for f in ("document_front", "document_back", "shop_photo") if getattr(obj, f)]
+        return format_html_join(
+            "", '<a href="{0}" target="_blank"><img src="{0}" style="height:160px;margin-right:8px"></a>',
+            ((reverse("private-verification-file", args=[obj.pk, f]),) for f in fields),
         )
 
     def _decide(self, request, queryset, approved):
@@ -52,6 +57,7 @@ class VerificationRequestAdmin(admin.ModelAdmin):
             vr.reviewed_by = request.user
             vr.reviewed_at = timezone.now()
             vr.save()
+            audit(request, "verification.approved" if approved else "verification.rejected", vr.vendor, {"note": vr.admin_note})
             if approved:
                 vr.vendor.is_verified = True
                 vr.vendor.verified_at = timezone.now()

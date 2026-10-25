@@ -5,19 +5,14 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.core.tests_utils import GuineeMallTestCase
+from apps.core.tests_utils import GuineeMallTestCase, image_file
 from apps.vendors.models import Vendor
 
 from .models import Statut
 
-PNG = (
-    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
-    b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
-)
-
-
 class StatutModelTests(TestCase):
     def setUp(self):
+        super().setUp()
         user = User.objects.create_user(email="v@test.gn", password="x", name="Vendeur", role=User.Role.VENDEUR)
         self.vendor = Vendor.objects.create(user=user, shop_name="Boutique Kipé")
 
@@ -48,12 +43,13 @@ class SlugTests(TestCase):
 @override_settings(MEDIA_ROOT="/tmp/claude-1000/guineemall-test-media")
 class StatutApiTests(GuineeMallTestCase):
     def setUp(self):
+        super().setUp()
         self.vendor = self.make_vendor("Kipé")
         self.product = self.make_product(self.vendor)
 
     def publish(self, vendor, **extra):
         self.client.force_authenticate(vendor.user)
-        media = SimpleUploadedFile("promo.png", PNG, content_type="image/png")
+        media = image_file("promo.png")
         return self.client.post("/api/vendor/statuts/", {"media": media, "caption": "Promo !", **extra}, format="multipart")
 
     def test_publier_un_statut_lie_a_un_produit(self):

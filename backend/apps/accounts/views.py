@@ -1,18 +1,30 @@
 from rest_framework import generics, permissions, viewsets
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+from apps.core.throttling import LoginAccountThrottle, LoginIPThrottle, RegisterThrottle
 
 from .models import Address
-from .serializers import AddressSerializer, RegisterSerializer, UserSerializer, VendorRegisterSerializer
+from .serializers import AddressSerializer, LoginSerializer, RegisterSerializer, UserSerializer, VendorRegisterSerializer
+
+
+class LoginView(TokenObtainPairView):
+    """Connexion par email + mot de passe, limitée par IP et par compte (anti force brute)."""
+
+    throttle_classes = [LoginIPThrottle, LoginAccountThrottle]
+    serializer_class = LoginSerializer
 
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [RegisterThrottle]
 
 
 class VendorRegisterView(generics.CreateAPIView):
     serializer_class = VendorRegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [RegisterThrottle]
 
 
 class MeView(generics.RetrieveUpdateAPIView):

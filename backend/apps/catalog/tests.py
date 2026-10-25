@@ -54,6 +54,7 @@ class CatalogTests(GuineeMallTestCase):
 
 class ReviewTests(GuineeMallTestCase):
     def setUp(self):
+        super().setUp()
         from apps.orders.models import Order, OrderItem, VendorOrder
 
         self.vendor = self.make_vendor()

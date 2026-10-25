@@ -24,6 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient])
 
   const logout = useCallback(() => {
+    // Révoque le jeton côté serveur : même volé, il ne pourra plus servir
+    const refresh = tokens.refresh
+    if (refresh) api.post('/auth/logout/', { refresh }).catch(() => {})
     tokens.clear()
     queryClient.setQueryData(['me'], null)
     queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' })
@@ -39,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading: isLoading && !!tokens.access,
       logout,
-      login: async (email: string, password: string) => {
-        const { data } = await api.post('/auth/token/', { email, password })
+      login: async (email: string, password: string, otp?: string) => {
+        const { data } = await api.post('/auth/token/', { email, password, ...(otp ? { otp } : {}) })
         tokens.set(data.access, data.refresh)
         return fetchMe()
       },

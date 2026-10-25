@@ -1,6 +1,8 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.catalog.models import Product
+from apps.core.uploads import check_upload
 
 from .models import Statut
 
@@ -54,16 +56,13 @@ class VendorStatutSerializer(serializers.ModelSerializer):
             self.fields["product_slug"].queryset = vendor.products.alive()
 
     def validate_media(self, media):
-        content_type = getattr(media, "content_type", "") or ""
-        if content_type.startswith("image/"):
-            kind, limit = Statut.MediaType.IMAGE, MAX_IMAGE_SIZE
-        elif content_type.startswith("video/"):
-            kind, limit = Statut.MediaType.VIDEO, MAX_VIDEO_SIZE
-        else:
-            raise serializers.ValidationError("Seules les images et les vidéos sont acceptées.")
-        if media.size > limit:
-            raise serializers.ValidationError(f"Fichier trop lourd (maximum {limit // (1024 * 1024)} Mo).")
-        self._media_type = kind
+        try:
+            family = check_upload(media, {"image", "video"}, max_mb=MAX_VIDEO_SIZE // (1024 * 1024))
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages[0])
+        if family == "image" and media.size > MAX_IMAGE_SIZE:
+            raise serializers.ValidationError(f"Image trop lourde ({MAX_IMAGE_SIZE // (1024 * 1024)} Mo maximum).")
+        self._media_type = Statut.MediaType.IMAGE if family == "image" else Statut.MediaType.VIDEO
         return media
 
     def create(self, validated_data):

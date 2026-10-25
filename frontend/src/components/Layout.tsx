@@ -51,7 +51,7 @@ export default function Layout() {
         <div className="bg-ink px-4 py-2 text-center text-xs font-medium text-white sm:text-sm">{config.site.announcement}</div>
       )}
       <Header />
-      <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-up px-4 py-6 sm:py-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 animate-fade-in px-4 py-6 sm:py-8">
         <BackButton />
         <Outlet />
       </main>

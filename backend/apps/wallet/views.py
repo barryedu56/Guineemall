@@ -47,6 +47,7 @@ class WalletViewSet(viewsets.GenericViewSet):
 
 class PayoutViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     serializer_class = PayoutRequestSerializer
+    throttle_scope = "money"
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
 
@@ -67,6 +68,7 @@ class CashDepositViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewset
     """Versements d'espèces dues à la plateforme (livreurs, boutiques en paiement à la livraison)."""
 
     serializer_class = CashDepositSerializer
+    throttle_scope = "money"
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
 

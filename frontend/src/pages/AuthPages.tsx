@@ -8,7 +8,7 @@ import { Button, ErrorBox, Input, PhoneInput, Textarea } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
 import { useToast } from '../context/toast'
-import { api, errorMessage, formatGNF } from '../lib/api'
+import { api, errorCode, errorMessage, formatGNF } from '../lib/api'
 import { affiliateCode } from '../lib/prefs'
 
 /** Mise en page des écrans de compte : formulaire à gauche, arguments de la marque à droite. */
@@ -74,24 +74,65 @@ function useSubmit(action: () => Promise<void>) {
 export function LoginPage() {
   const { login } = useAuth()
   const [params] = useSearchParams()
-  const [form, set] = useFormState({ email: '', password: '' })
-  // La redirection est faite par <GuestOnly> dès que l'utilisateur est connecté
   const toast = useToast()
-  const { submit, error, loading } = useSubmit(async () => {
-    const user = await login(form.email, form.password)
-    toast(`Bienvenue ${user.name.split(' ')[0]} 👋`)
-  })
+  const [form, set] = useFormState({ email: '', password: '' })
+  // Double authentification : le champ du code apparaît quand le serveur le demande
+  const [otp, setOtp] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const user = await login(form.email, form.password, otp ?? undefined)
+      toast(`Bienvenue ${user.name.split(' ')[0]} 👋`)
+    } catch (err) {
+      const code = errorCode(err)
+      if (code === 'otp_required') {
+        setOtp('')
+      } else {
+        const msg = errorMessage(err)
+        setError(msg.includes('No active account') || msg.includes('Aucun compte actif') ? 'Email ou mot de passe incorrect.' : msg)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <AuthLayout title="Bon retour 👋" subtitle="Connectez-vous pour commander, suivre vos colis et discuter avec les boutiques.">
       <form onSubmit={submit} className="space-y-4">
-        <Input label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
-        <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required autoComplete="current-password" />
-        <div className="text-right">
-          <Link to="/mot-de-passe/oublie" className="text-sm font-semibold text-primary-dark hover:underline">Mot de passe oublié ?</Link>
-        </div>
+        {otp === null ? (
+          <>
+            <Input label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
+            <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required autoComplete="current-password" />
+            <div className="text-right">
+              <Link to="/mot-de-passe/oublie" className="text-sm font-semibold text-primary-dark hover:underline">Mot de passe oublié ?</Link>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <p className="flex items-center gap-2 rounded-2xl bg-primary-light p-3 text-sm font-medium">
+              <ShieldCheck className="size-5 shrink-0" /> Ouvrez votre application d'authentification et saisissez le code à 6 chiffres.
+            </p>
+            <input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              placeholder="••••••"
+              aria-label="Code de double authentification"
+              className="w-full rounded-2xl border border-ink/15 px-4 py-3 text-center font-mono text-3xl tracking-[0.5em]"
+            />
+          </div>
+        )}
         <ErrorBox message={error} />
-        <Button type="submit" size="lg" loading={loading} className="w-full">Se connecter</Button>
+        <Button type="submit" size="lg" loading={loading} disabled={otp !== null && otp.length !== 6} className="w-full">
+          {otp === null ? 'Se connecter' : 'Valider le code'}
+        </Button>
       </form>
       <p className="mt-8 text-center text-sm text-ink/60">
         Pas encore de compte ?{' '}

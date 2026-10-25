@@ -6,6 +6,7 @@ class OrderTestCase(GuineeMallTestCase):
     """Deux boutiques, un produit chacune, un client avec une adresse."""
 
     def setUp(self):
+        super().setUp()
         self.user = self.make_client()
         self.address = self.make_address(self.user)
         self.kipe = self.make_vendor("Kipé")

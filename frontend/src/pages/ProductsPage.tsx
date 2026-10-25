@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ProductGrid, ProductGridSkeleton } from '../components/ProductCard'
-import { Button, Empty, Pager } from '../components/ui'
+import { Button, Empty, Overlay, Pager } from '../components/ui'
 import { useSiteConfig } from '../context/settings'
 import { api, formatNumber } from '../lib/api'
 import { useCategories } from '../lib/queries'
@@ -72,6 +72,7 @@ export default function ProductsPage() {
 
       {/* Filtres sur mobile : panneau coulissant */}
       {filtersOpen && (
+        <Overlay>
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal>
           <button className="absolute inset-0 bg-ink/40" onClick={() => setFiltersOpen(false)} aria-label="Fermer les filtres" />
           <div className="absolute inset-x-0 bottom-0 max-h-[85vh] animate-fade-up overflow-y-auto rounded-t-[2rem] bg-surface p-6">
@@ -83,6 +84,7 @@ export default function ProductsPage() {
             <Button className="mt-6 w-full" onClick={() => setFiltersOpen(false)}>Voir {data?.count ?? ''} produit(s)</Button>
           </div>
         </div>
+        </Overlay>
       )}
 
       <section>

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from apps.accounts.models import User
 from apps.accounts.serializers import RegisterSerializer
+from apps.core.throttling import RegisterThrottle
 from apps.orders.services import OrderError
 
 from . import services
@@ -57,6 +58,7 @@ class RiderRegisterSerializer(RegisterSerializer):
 class RiderRegisterView(generics.CreateAPIView):
     serializer_class = RiderRegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [RegisterThrottle]
 
 
 class RiderProfileView(generics.RetrieveUpdateAPIView):

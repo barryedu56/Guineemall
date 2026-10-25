@@ -4,12 +4,13 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import AddressForm from '../components/AddressForm'
+import TwoFactor from '../components/TwoFactor'
 import { CurrencySwitcher } from '../components/Layout'
 import { ProductGrid } from '../components/ProductCard'
 import { Badge, Button, Empty, ErrorBox, Input, PageHeader, PhoneInput, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useToast } from '../context/toast'
-import { api, errorMessage, formatPhone } from '../lib/api'
+import { api, errorMessage, formatPhone, tokens } from '../lib/api'
 import type { Address, Paginated, ProductSummary, User } from '../lib/types'
 
 export function AccountPage() {
@@ -124,6 +125,7 @@ export function AccountPage() {
       </section>
 
       <ChangePassword />
+      <TwoFactor />
 
       <section className="card p-6">
         <h2 className="mb-2 font-semibold">Vous êtes à l'étranger ?</h2>
@@ -148,10 +150,11 @@ function ChangePassword() {
   const toast = useToast()
   const [form, setForm] = useState({ current_password: '', new_password: '' })
   const change = useMutation({
-    mutationFn: () => api.post('/auth/password/change/', form),
-    onSuccess: () => {
+    mutationFn: async () => (await api.post<{ access: string; refresh: string }>('/auth/password/change/', form)).data,
+    onSuccess: (fresh) => {
+      tokens.set(fresh.access, fresh.refresh)
       setForm({ current_password: '', new_password: '' })
-      toast('Mot de passe modifié')
+      toast('Mot de passe modifié : vos autres appareils ont été déconnectés')
     },
   })
   return (

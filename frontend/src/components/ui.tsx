@@ -1,4 +1,6 @@
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+
 import { formatNumber } from '../lib/api'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
@@ -272,4 +274,12 @@ export function LoadMore({ hasMore, loading, onClick }: { hasMore: boolean; load
       <Button variant="outline" loading={loading} onClick={onClick}>Voir plus</Button>
     </div>
   )
+}
+
+/**
+ * Affiche son contenu à la racine du document (au-dessus de tout, plein écran fiable),
+ * quel que soit l'endroit où le composant est utilisé dans la page.
+ */
+export function Overlay({ children }: { children: ReactNode }) {
+  return createPortal(children, document.body)
 }

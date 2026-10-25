@@ -8,7 +8,7 @@ import { ProductGrid } from '../components/ProductCard'
 import ShareButton from '../components/ShareButton'
 import Stars from '../components/Stars'
 import { ShopAvatar } from '../components/Statuts'
-import { Button, SectionHeader, Skeleton } from '../components/ui'
+import { Button, Overlay, SectionHeader, Skeleton } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useCart } from '../context/cart'
 import { useIsOwnShop } from '../context/ownership'
@@ -273,10 +273,12 @@ function ProductView({ product }: { product: ProductDetail }) {
 
       {/* Barre d'achat fixe sur mobile */}
       {product.stock > 0 && !own && (
+        <Overlay>
         <div className="fixed inset-x-0 bottom-16 z-30 flex gap-2 border-t border-ink/5 bg-surface/95 p-3 backdrop-blur-xl sm:hidden">
           <Button variant="dark" className="flex-1" onClick={() => addToCart(true)}>Acheter</Button>
           <Button className="flex-1" onClick={() => addToCart(false)}><ShoppingBag className="size-5" /> Panier</Button>
         </div>
+        </Overlay>
       )}
     </>
   )

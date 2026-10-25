@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import SoftDeleteModel, TimeStampedModel, unique_slug
+from apps.core.uploads import validate_image_5mb
 
 
 class Category(TimeStampedModel):
@@ -15,7 +16,7 @@ class Category(TimeStampedModel):
     parent = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="children"
     )
-    image = models.ImageField(upload_to="categories/", blank=True)
+    image = models.ImageField(upload_to="categories/", blank=True, validators=[validate_image_5mb])
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
 
     class Meta:
@@ -82,7 +83,7 @@ class ProductImage(models.Model):
     """Plusieurs photos par produit (l'ancien projet n'en gérait qu'une)."""
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
-    image = models.ImageField(upload_to="products/")
+    image = models.ImageField(upload_to="products/", validators=[validate_image_5mb])
     position = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
@@ -121,7 +122,7 @@ class Review(TimeStampedModel):
 
 class ReviewPhoto(models.Model):
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="photos")
-    image = models.ImageField(upload_to="reviews/")
+    image = models.ImageField(upload_to="reviews/", validators=[validate_image_5mb])
 
 
 class ProductDailyStat(models.Model):
