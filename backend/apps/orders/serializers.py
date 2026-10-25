@@ -75,13 +75,23 @@ class PaySerializer(serializers.Serializer):
     phone = PhoneSerializerField(required=False, allow_blank=True)
 
 
+def first_image(product):
+    """Photo principale du produit commandé (images préchargées avec la commande)."""
+    images = list(product.images.all()) if product else []
+    return images[0].image.url if images else None
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     product_slug = serializers.SlugRelatedField(source="product", slug_field="slug", read_only=True)
     subtotal = serializers.IntegerField(read_only=True)
+    product_image = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ["id", "product_slug", "product_name", "unit_price", "quantity", "subtotal"]
+        fields = ["id", "product_slug", "product_name", "product_image", "unit_price", "quantity", "subtotal"]
+
+    def get_product_image(self, item):
+        return first_image(item.product)
 
 
 def tracking(vendor_order, with_rating=False):

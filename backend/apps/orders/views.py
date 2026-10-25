@@ -76,7 +76,7 @@ def with_details(queryset):
             "vendor_orders",
             queryset=VendorOrder.objects.select_related("vendor", "delivery__rider__user"),
         ),
-        Prefetch("vendor_orders__items", queryset=OrderItem.objects.select_related("product")),
+        Prefetch("vendor_orders__items", queryset=OrderItem.objects.select_related("product").prefetch_related("product__images")),
         "status_history",
     )
 
@@ -193,7 +193,7 @@ class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, views
                 ])
             )
             .select_related("order__user", "order__pickup_point", "vendor", "delivery__rider__user")
-            .prefetch_related(Prefetch("items", queryset=OrderItem.objects.select_related("product")))
+            .prefetch_related(Prefetch("items", queryset=OrderItem.objects.select_related("product").prefetch_related("product__images")))
         )
 
     @action(detail=False)

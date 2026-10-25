@@ -133,6 +133,7 @@ export interface OrderItem {
   id: number
   product_slug: string | null
   product_name: string
+  product_image: string | null
   unit_price: number
   quantity: number
   subtotal: number
@@ -553,7 +554,7 @@ export interface RiderDelivery {
   cash_to_collect: number
   cash_for_shop: number
   cash_handed_at: string | null
-  items: { name: string; quantity: number }[]
+  items: { name: string; quantity: number; image: string | null }[]
   items_count: number
   pickup: {
     shop_name: string

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Package } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
 import { formatNumber } from '../lib/api'
@@ -282,4 +282,15 @@ export function LoadMore({ hasMore, loading, onClick }: { hasMore: boolean; load
  */
 export function Overlay({ children }: { children: ReactNode }) {
   return createPortal(children, document.body)
+}
+
+/** Photo d'un produit commandé (ou une icône s'il n'en a pas). */
+export function Thumb({ src, alt = '', className = 'size-12' }: { src: string | null | undefined; alt?: string; className?: string }) {
+  return src ? (
+    <img src={src} alt={alt} loading="lazy" className={`shrink-0 rounded-xl bg-background object-cover ring-1 ring-ink/10 ${className}`} />
+  ) : (
+    <span className={`flex shrink-0 items-center justify-center rounded-xl bg-background text-ink/30 ring-1 ring-ink/10 ${className}`}>
+      <Package className="size-1/2" />
+    </span>
+  )
 }

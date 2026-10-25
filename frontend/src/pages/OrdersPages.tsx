@@ -7,7 +7,7 @@ import { ContactButtons, Timeline } from '../components/Delivery'
 import PaymentInfo from '../components/PaymentInfo'
 import Price from '../components/Price'
 import { StarInput } from '../components/Stars'
-import { Button, Empty, ErrorBox, PageHeader, Pager, PhoneInput, Spinner, StatusBadge } from '../components/ui'
+import { Button, Empty, ErrorBox, PageHeader, Pager, PhoneInput, Spinner, StatusBadge, Thumb } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useRealtime } from '../context/realtime'
 import { useSiteConfig } from '../context/settings'
@@ -195,8 +195,9 @@ export function OrderDetailPage() {
             </div>
             <ul className="divide-y divide-ink/5 text-sm">
               {vo.items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-2 py-2">
-                  <span>
+                <li key={item.id} className="flex items-center justify-between gap-3 py-2">
+                  <Thumb src={item.product_image} alt={item.product_name} />
+                  <span className="min-w-0 flex-1">
                     {item.quantity} × {item.product_slug ? <Link to={`/produit/${item.product_slug}`} className="hover:underline">{item.product_name}</Link> : item.product_name}
                     {vo.status === 'delivered' && item.product_slug && (
                       <Link to={`/produit/${item.product_slug}#avis`} className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-primary-dark hover:underline">

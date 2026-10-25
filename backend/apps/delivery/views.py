@@ -120,7 +120,7 @@ class RiderDeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
     def get_queryset(self):
         queryset = Delivery.objects.filter(rider=self.request.user.rider).select_related(
             "vendor_order__order__user", "vendor_order__vendor__user", "rider__user"
-        ).prefetch_related("vendor_order__items")
+        ).prefetch_related("vendor_order__items__product__images")
         states = self.STATES.get(self.request.query_params.get("etat", ""))
         return queryset.filter(status__in=states) if states else queryset
 

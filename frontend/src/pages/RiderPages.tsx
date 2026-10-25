@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ContactButtons, Countdown, DeliveryChat, Timeline } from '../components/Delivery'
 
 import Price from '../components/Price'
-import { Button, Empty, ErrorBox, Input, PhoneInput, Select, Spinner } from '../components/ui'
+import { Button, Empty, ErrorBox, Input, PhoneInput, Select, Spinner, Thumb } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useRealtime } from '../context/realtime'
 import { useSiteConfig } from '../context/settings'
@@ -404,8 +404,14 @@ export function RiderDeliveryPage() {
             <span className="block text-ink/70">{d.pickup.landmark}</span>
             {d.pickup.hours && <span className="block text-ink/60">Horaires : {d.pickup.hours}</span>}
           </p>
-          <ul className="text-sm text-ink/70">
-            {d.items.map((i, n) => <li key={n}>{i.quantity} × {i.name}</li>)}
+          <ul className="space-y-2 text-sm">
+            {d.items.map((i, n) => (
+              <li key={n} className="flex items-center gap-3">
+                <Thumb src={i.image} alt={i.name} />
+                <span className="flex-1">{i.name}</span>
+                <span className="font-bold">× {i.quantity}</span>
+              </li>
+            ))}
           </ul>
           {ongoing && (
             <ContactButtons phone={d.pickup.phone} whatsapp={d.pickup.whatsapp} message={`Bonjour, je suis le livreur pour la commande #${d.order_id}.`} latitude={d.pickup.latitude} longitude={d.pickup.longitude} />

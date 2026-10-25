@@ -124,7 +124,10 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         return cash_for_shop(delivery)
 
     def get_items(self, delivery):
-        return [{"name": i.product_name, "quantity": i.quantity} for i in delivery.vendor_order.items.all()]
+        from apps.orders.serializers import first_image
+
+        return [{"name": i.product_name, "quantity": i.quantity, "image": first_image(i.product)}
+                for i in delivery.vendor_order.items.all()]
 
     def get_items_count(self, delivery):
         return sum(i.quantity for i in delivery.vendor_order.items.all())

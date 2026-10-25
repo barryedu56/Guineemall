@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { ContactButtons, Countdown, DeliveryChat, Timeline } from '../../components/Delivery'
-import { Button, Empty, ErrorBox, Pager, Spinner, StatusBadge } from '../../components/ui'
+import { Button, Empty, ErrorBox, Pager, Spinner, StatusBadge, Thumb } from '../../components/ui'
 import { useRealtime } from '../../context/realtime'
 import { useSiteConfig } from '../../context/settings'
 import { useToast } from '../../context/toast'
@@ -30,7 +30,7 @@ function nextStep(order: VendorSideOrder): { text: string; urgent: boolean } {
       if (courier.status === 'assigned') return { text: `${courier.rider?.name} vient chercher le colis`, urgent: false }
       return { text: `${courier.rider?.name} livre le client`, urgent: false }
     default:
-      return { text: order.status_label, urgent: false }
+      return { text: '', urgent: false } // terminée : le badge de statut suffit
   }
 }
 
@@ -118,26 +118,34 @@ function OrderRow({ order }: { order: VendorSideOrder }) {
   const next = nextStep(order)
   const articles = order.items.reduce((n, i) => n + i.quantity, 0)
   return (
-    <Link to={`/vendeur/commandes/${order.id}`} className="card card-hover flex items-center gap-4 p-4">
+    <Link to={`/vendeur/commandes/${order.id}`} className="card card-hover flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
+      <div className="relative shrink-0">
+        <Thumb src={order.items[0]?.product_image} alt={order.items[0]?.product_name} className="size-16 sm:size-20" />
+        {order.items.length > 1 && (
+          <span className="absolute -bottom-1.5 -right-1.5 rounded-full bg-ink px-2 py-0.5 text-xs font-bold text-white ring-2 ring-surface">+{order.items.length - 1}</span>
+        )}
+      </div>
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-bold">#{order.order_id} · {order.client_name}</p>
-          <StatusBadge status={order.status} label={order.status_label} />
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="truncate font-bold">#{order.order_id} · {order.client_name}</p>
+          <p className="shrink-0 font-bold">{formatGNF(order.total_amount)}</p>
         </div>
         <p className="truncate text-sm text-ink/60">
           {articles} article{articles > 1 ? 's' : ''} · {order.items.map((i) => i.product_name).join(', ')}
         </p>
-        <p className={`flex items-center gap-1.5 text-sm font-semibold ${next.urgent ? 'text-amber-700' : 'text-ink/70'}`}>
-          {next.urgent && <span className="size-2 animate-pulse rounded-full bg-amber-500" />}
-          {next.text}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <StatusBadge status={order.status} label={order.status_label} />
+          {next.text && (
+            <span className={`flex items-center gap-1.5 font-semibold ${next.urgent ? 'text-amber-700' : 'text-ink/70'}`}>
+              {next.urgent && <span className="size-2 animate-pulse rounded-full bg-amber-500" />}
+              {next.text}
+            </span>
+          )}
           {!!order.courier?.unread && <span className="rounded-full bg-primary-dark px-2 text-xs text-white">{order.courier.unread} message(s)</span>}
-        </p>
+          <span className="ml-auto text-xs text-ink/50">{timeAgo(order.created_at)}</span>
+        </div>
       </div>
-      <div className="shrink-0 text-right">
-        <p className="font-bold">{formatGNF(order.total_amount)}</p>
-        <p className="text-xs text-ink/50">{timeAgo(order.created_at)}</p>
-      </div>
-      <ChevronRight className="size-5 shrink-0 text-ink/30" />
+      <ChevronRight className="hidden size-5 shrink-0 text-ink/30 sm:block" />
     </Link>
   )
 }
@@ -193,6 +201,25 @@ export function VendorOrderDetailPage() {
           </div>
           <StatusBadge status={order.status} label={order.status_label} />
         </div>
+
+        <section className="card p-5">
+          <h3 className="mb-3 font-bold">Ce que le client a commandé</h3>
+          <ul className="space-y-3">
+            {order.items.map((item) => (
+              <li key={item.id} className="flex items-center gap-4">
+                <Thumb src={item.product_image} alt={item.product_name} className="size-20 sm:size-24" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{item.product_name}</p>
+                  <p className="text-sm text-ink/60">{formatGNF(item.unit_price)} l'unité</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="rounded-full bg-primary-light px-3 py-1 text-lg font-extrabold">× {item.quantity}</p>
+                  <p className="mt-1 text-sm font-semibold">{formatGNF(item.subtotal)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <ErrorBox message={error} />
 
@@ -284,14 +311,9 @@ export function VendorOrderDetailPage() {
           <Timeline steps={order.timeline} />
         </section>
         <section className="card p-5">
-          <h3 className="mb-3 font-bold">Articles</h3>
+          <h3 className="mb-3 font-bold">Montants</h3>
           <ul className="space-y-1 text-sm">
-            {order.items.map((item) => (
-              <li key={item.id} className="flex justify-between gap-2">
-                <span>{item.quantity} × {item.product_name}</span>
-                <span className="shrink-0">{formatGNF(item.subtotal)}</span>
-              </li>
-            ))}
+            <li className="flex justify-between gap-2"><span>Articles</span><span className="shrink-0">{formatGNF(order.subtotal)}</span></li>
             {order.vendor_discount > 0 && (
               <li className="flex justify-between text-green-700"><span>Votre code promo</span><span>-{formatGNF(order.vendor_discount)}</span></li>
             )}
