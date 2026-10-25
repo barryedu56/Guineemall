@@ -129,19 +129,32 @@ class VendorOrderSerializer(serializers.ModelSerializer):
     delivery_code = serializers.SerializerMethodField()
     timeline = serializers.SerializerMethodField()
     code_blocked = serializers.SerializerMethodField()
+    can_contest = serializers.SerializerMethodField()
+    contested = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorOrder
         fields = [
             "id", "shop_name", "shop_slug", "subtotal", "delivery_fee", "vendor_discount", "platform_discount",
             "total_amount", "status", "status_label", "received_at", "items", "tracking", "delivery_code", "timeline",
-            "delivery_code_attempts", "code_blocked", "client_report",
+            "delivery_code_attempts", "code_blocked", "client_report", "confirmation_requested_at", "client_report_at",
+            "contest_until", "can_contest", "contested",
         ]
 
     def get_code_blocked(self, vendor_order):
         from .disputes import is_blocked
 
         return is_blocked(vendor_order)
+
+    def get_can_contest(self, vendor_order):
+        from .disputes import can_contest
+
+        return can_contest(vendor_order)
+
+    def get_contested(self, vendor_order):
+        from .disputes import is_contested
+
+        return is_contested(vendor_order)
 
     def get_timeline(self, vendor_order):
         return vendor_order_timeline(vendor_order)

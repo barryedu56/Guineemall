@@ -85,6 +85,8 @@ def dashboard(request):
             "payout_accounts_pending": PayoutAccount.objects.filter(status=PayoutAccount.Status.PENDING).count(),
             "codes_blocked": VendorOrder.objects.filter(
                 status=VendorOrder.Status.READY, delivery_code_attempts__gte=settings.DELIVERY_CODE_MAX_ATTEMPTS
+            ).count() + VendorOrder.objects.filter(
+                status=VendorOrder.Status.DELIVERED, client_report="not_received", funds_released_at__isnull=True
             ).count(),
         },
         "orders_by_status": list(

@@ -201,6 +201,11 @@ export interface Order {
     delivery_code_attempts: number
     code_blocked: boolean
     client_report: '' | 'received' | 'not_received'
+    client_report_at: string | null
+    confirmation_requested_at: string | null
+    contest_until: string | null
+    can_contest: boolean
+    contested: boolean
   }[]
   status_history: { status: string; note: string; created_at: string }[]
   created_at: string

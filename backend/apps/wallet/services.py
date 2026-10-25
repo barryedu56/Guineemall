@@ -51,6 +51,11 @@ def release_funds(vendor_order):
     vendor_order = VendorOrder.objects.select_for_update().select_related("order", "vendor__user").get(pk=vendor_order.pk)
     if vendor_order.funds_released_at or vendor_order.status != VendorOrder.Status.DELIVERED:
         return False
+    # Le client conteste la livraison, ou peut encore la contester : on attend
+    if vendor_order.client_report == VendorOrder.ClientReport.NOT_RECEIVED:
+        return False
+    if vendor_order.contest_until and vendor_order.contest_until > timezone.now() and not vendor_order.received_at:
+        return False
 
     order = vendor_order.order
     if order.payment_method == Order.PaymentMethod.CASH_ON_DELIVERY:

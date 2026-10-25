@@ -148,6 +148,11 @@ class VendorOrder(TimeStampedModel):
 
     client_report = models.CharField(max_length=15, choices=ClientReport.choices, blank=True)
     client_report_at = models.DateTimeField(null=True, blank=True)
+    confirmation_requested_at = models.DateTimeField("confirmation demandée au client le", null=True, blank=True)
+    contest_until = models.DateTimeField(
+        "contestable jusqu'au", null=True, blank=True,
+        help_text="Réception validée par l'équipe sans réponse du client : il peut la contester jusqu'à cette date",
+    )
 
     accepted_at = models.DateTimeField("acceptée le", null=True, blank=True)
     ready_at = models.DateTimeField("colis prêt le", null=True, blank=True)

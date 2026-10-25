@@ -171,8 +171,8 @@ class OwnShopTests(OrderTestCase):
         self.assertEqual(self.add(self.riz, 1).status_code, 400)
 
 
-class BlockedDeliveryTests(OrderTestCase):
-    """Codes faux répétés : le client est prévenu, répond lui-même, l'équipe tranche."""
+class BlockedDeliveryBase(OrderTestCase):
+    """Commande payée en ligne, colis prêt, que la boutique livre elle-même."""
 
     def setUp(self):
         super().setUp()
@@ -191,6 +191,11 @@ class BlockedDeliveryTests(OrderTestCase):
         self.client.force_authenticate(self.madina.user)
         for _ in range(n):
             self.client.post(f"/api/vendor/orders/{self.vo.pk}/status/", {"status": "delivered", "code": self.wrong})
+        self.vo.refresh_from_db()
+
+
+class BlockedDeliveryTests(BlockedDeliveryBase):
+    """Codes faux répétés : le client est prévenu, répond lui-même, l'équipe tranche."""
 
     def test_client_prevenu_puis_bloque(self):
         self.wrong_codes(1)
@@ -245,3 +250,61 @@ class BlockedDeliveryTests(OrderTestCase):
         with self.assertRaises(OrderError):
             check_delivery_code(other, "0000", by=self.madina.user)
         self.assertTrue(admin.notifications.filter(title__contains="Comportement suspect").exists())
+
+
+class ClientWordPrevailsTests(BlockedDeliveryBase):
+    """La parole du client prime : l'équipe ne peut pas valider à sa place un colis qu'il dit ne pas avoir reçu."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.accounts.models import User
+
+        self.admin = User.objects.create_superuser(email="adm@test.gn", password="x", name="Adm")
+        self.wrong_codes(5)
+
+    def report(self, received):
+        self.client.force_authenticate(self.user)
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(f"/api/orders/{self.order_id}/report/", {"vendor_order": self.vo.pk, "received": received})
+
+    def test_rien_recu_seul_le_client_peut_revenir_dessus(self):
+        from apps.orders.disputes import admin_decision
+        from apps.orders.services import OrderError
+
+        self.report(False)
+        self.vo.refresh_from_db()
+        with self.assertRaises(OrderError):
+            admin_decision(self.admin, self.vo, "received", "Il l'a reçu en fait")
+        admin_decision(self.admin, self.vo, "ask_client", "Au téléphone il pense que son frère l'a reçu")
+        self.assertTrue(self.user.notifications.filter(title__contains="avez-vous reçu votre colis").exists())
+        self.assertEqual(self.report(True).data["vendor_orders"][0]["status"], "delivered")
+
+    def test_validation_par_l_equipe_contestable(self):
+        from apps.orders.disputes import admin_decision
+        from apps.wallet.models import LedgerEntry
+        from apps.wallet.services import release_funds
+
+        admin_decision(self.admin, self.vo, "received", "Client joint, il a le colis")
+        self.vo.refresh_from_db()
+        self.assertEqual(self.vo.status, "delivered")
+        self.assertIsNotNone(self.vo.contest_until)
+        release_funds(self.vo)
+        self.assertFalse(LedgerEntry.objects.exists())  # pas payée pendant le délai de contestation
+
+        data = self.report(False).data["vendor_orders"][0]  # le client conteste
+        self.assertTrue(data["contested"])
+        VendorOrder.objects.filter(pk=self.vo.pk).update(contest_until=None)
+        release_funds(self.vo)
+        self.assertFalse(LedgerEntry.objects.exists())  # contestée : toujours gelée
+        self.vo.refresh_from_db()
+        admin_decision(self.admin, self.vo, "cancel", "Rien reçu, la boutique ne justifie pas la remise")
+        self.vo.refresh_from_db()
+        self.assertEqual(self.vo.status, "cancelled")
+
+    def test_le_client_confirme_apres_validation(self):
+        from apps.orders.disputes import admin_decision
+        from apps.wallet.models import LedgerEntry
+
+        admin_decision(self.admin, self.vo, "received", "Client joint, il a le colis")
+        self.report(True)
+        self.assertTrue(LedgerEntry.objects.filter(user=self.madina.user, kind="sale").exists())

@@ -209,8 +209,8 @@ export function OrderDetailPage() {
                 </li>
               ))}
             </ul>
-            {vo.code_blocked ? (
-              <BlockedDelivery orderId={order.id} vendorOrderId={vo.id} shop={vo.shop_name} report={vo.client_report} orderKey={key} />
+            {vo.code_blocked || vo.contested || vo.can_contest ? (
+              <DeliveryQuestion orderId={order.id} vo={vo} orderKey={key} />
             ) : vo.status === 'ready' && vo.delivery_code_attempts > 0 && (
               <p className="mt-3 flex gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
                 <ShieldAlert className="size-5 shrink-0" />
@@ -332,27 +332,40 @@ function RateRider({ deliveryId, riderName, given, orderKey }: { deliveryId: num
   )
 }
 
-/** Livraison bloquée après trop de codes faux : le client dit lui-même s'il a reçu le colis. */
-function BlockedDelivery({ orderId, vendorOrderId, shop, report, orderKey }: { orderId: number; vendorOrderId: number; shop: string; report: string; orderKey: unknown[] }) {
+/**
+ * Le client dit lui-même s'il a reçu le colis : livraison bloquée (codes faux), confirmation demandée
+ * par l'équipe après un appel, ou réception validée par l'équipe qu'il peut contester.
+ */
+function DeliveryQuestion({ orderId, vo, orderKey }: { orderId: number; vo: Order['vendor_orders'][number]; orderKey: unknown[] }) {
   const queryClient = useQueryClient()
   const toast = useToast()
   const answer = useMutation({
-    mutationFn: async (received: boolean) => (await api.post<Order>(`/orders/${orderId}/report/`, { vendor_order: vendorOrderId, received })).data,
+    mutationFn: async (received: boolean) => (await api.post<Order>(`/orders/${orderId}/report/`, { vendor_order: vo.id, received })).data,
     onSuccess: (order) => queryClient.setQueryData(orderKey, order),
     onError: (e) => toast(errorMessage(e), 'error'),
   })
-  if (report === 'not_received') {
+  const shop = vo.shop_name
+  // L'équipe a demandé confirmation après le signalement : on repose la question
+  const askedAgain = !!vo.confirmation_requested_at && (!vo.client_report_at || vo.confirmation_requested_at > vo.client_report_at)
+  const said = vo.client_report === 'not_received' && !askedAgain
+
+  if (said) {
     return (
       <div className="mt-3 rounded-2xl bg-red-50 p-4 text-sm text-red-800">
         <p className="font-semibold">Signalement envoyé : vous n'avez pas reçu ce colis.</p>
-        <p>Notre équipe vous appelle. {shop} ne sera pas payée tant que ce n'est pas réglé.</p>
+        <p>Notre équipe vous appelle. {shop} ne sera pas payée tant que ce n'est pas réglé, et personne ne peut valider la livraison à votre place.</p>
       </div>
     )
   }
+  const [title, text] = vo.can_contest
+    ? ['Réception validée par notre équipe', `Après notre appel, la livraison du colis de ${shop} a été validée. Ce n'est pas le cas ? Signalez-le avant le ${formatDate(vo.contest_until!)} : la boutique ne sera pas payée avant.`]
+    : askedAgain
+      ? ['Avez-vous reçu votre colis ?', `Suite à notre échange, confirmez si vous avez bien le colis de ${shop}. Tant que vous ne confirmez pas, la boutique n'est pas payée.`]
+      : ['Livraison bloquée par sécurité', `Trop de codes faux ont été saisis pour ce colis. Notre équipe va vous appeler. Avez-vous le colis de ${shop} entre les mains ?`]
   return (
-    <div className="mt-3 space-y-3 rounded-2xl bg-red-50 p-4 text-red-900">
-      <p className="flex items-center gap-2 font-semibold"><ShieldAlert className="size-5" /> Livraison bloquée par sécurité</p>
-      <p className="text-sm">Trop de codes faux ont été saisis pour ce colis. Notre équipe va vous appeler. Avez-vous le colis de {shop} entre les mains ?</p>
+    <div className={`mt-3 space-y-3 rounded-2xl p-4 ${vo.can_contest ? 'bg-amber-50 text-amber-950' : 'bg-red-50 text-red-900'}`}>
+      <p className="flex items-center gap-2 font-semibold"><ShieldAlert className="size-5" /> {title}</p>
+      <p className="text-sm">{text}</p>
       <div className="flex flex-wrap gap-2">
         <Button loading={answer.isPending && answer.variables === true} onClick={() => window.confirm('Confirmer que vous avez bien reçu ce colis ?') && answer.mutate(true)}>
           Oui, j'ai bien reçu mon colis

@@ -102,12 +102,14 @@ class AdminVendorOrderSerializer(serializers.ModelSerializer):
     shop_phone = serializers.CharField(source="vendor.contact_phone", read_only=True)
     client_report_label = serializers.CharField(source="get_client_report_display", read_only=True)
     code_attempts = serializers.SerializerMethodField()
+    contested = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorOrder
         fields = [
             "id", "shop_name", "shop_phone", "subtotal", "delivery_fee", "vendor_discount", "platform_discount", "total_amount",
-            "status", "status_label", "delivery_code_attempts", "code_blocked", "client_report", "client_report_label",
+            "status", "status_label", "delivery_code_attempts", "code_blocked", "contested", "client_report",
+            "client_report_label", "client_report_at", "confirmation_requested_at", "contest_until",
             "code_attempts", "delivered_at", "received_at", "funds_released_at", "items", "rider",
         ]
 
@@ -126,6 +128,11 @@ class AdminVendorOrderSerializer(serializers.ModelSerializer):
         from apps.orders.disputes import is_blocked
 
         return is_blocked(vo)
+
+    def get_contested(self, vo):
+        from apps.orders.disputes import is_contested
+
+        return is_contested(vo)
 
     def get_rider(self, vo):
         delivery = getattr(vo, "delivery", None)

@@ -106,7 +106,7 @@ export function AdminOrderDetail() {
             {vo.items.map((i, n) => <li key={n} className="flex justify-between"><span>{i.quantity} × {i.name}</span><Price amount={i.quantity * i.unit_price} /></li>)}
           </ul>
           {vo.rider && <p className="text-sm">Livreur : <strong>{vo.rider.name}</strong> ({formatPhone(vo.rider.phone)}) · {vo.rider.status}</p>}
-          {vo.code_blocked && <BlockedDeliveryPanel order={order} vo={vo} ask={ask} action={action} />}
+          {(vo.code_blocked || vo.contested) && <BlockedDeliveryPanel order={order} vo={vo} ask={ask} action={action} />}
         </section>
       ))}
       {!!order.history?.length && (
@@ -292,21 +292,31 @@ function BlockedDeliveryPanel({ order, vo, ask, action }: {
   ask: ReturnType<typeof useAsk>[0]
   action: ReturnType<typeof useAdminAction>
 }) {
-  const decisions = [
-    { value: 'received', label: 'Le client a reçu le colis', help: 'La commande passe en livrée sans code, la boutique peut être payée.', variant: 'primary' as const },
+  // La parole du client prime : s'il a dit « rien reçu », l'équipe ne peut que lui demander de confirmer, ou annuler
+  const notReceived = vo.client_report === 'not_received'
+  const all = [
+    { value: 'received', label: 'Valider la réception', help: `Le client, joint par téléphone, dit avoir le colis. Il pourra contester pendant 48 h ; la boutique n'est payée qu'après.`, variant: 'primary' as const },
+    { value: 'ask_client', label: 'Demander au client de confirmer', help: 'Le client reçoit une demande de confirmation dans sa commande. Seul son clic valide la livraison.', variant: notReceived ? 'primary' as const : 'outline' as const },
     { value: 'retry', label: 'Redonner des essais', help: "Le client s'était trompé : le code peut être saisi à nouveau.", variant: 'outline' as const },
     { value: 'cancel', label: 'Annuler la livraison', help: "Le client n'a rien reçu : stock remis, remboursement en avoir si payé en ligne.", variant: 'danger' as const },
   ]
+  const decisions = all.filter((d) => !(notReceived && d.value === 'received') && !(vo.contested && d.value === 'retry'))
   async function decide(d: (typeof decisions)[number]) {
     const note = await ask({ title: d.label, label: `${d.help} Motif (ce que le client a dit au téléphone) — envoyé au client et à la boutique`, confirm: 'Confirmer', danger: d.value === 'cancel', required: true })
     if (note) action.mutate({ id: order.id, action: `delivery-decision/${vo.id}`, body: { decision: d.value, note }, success: 'Décision enregistrée, client et boutique prévenus' })
   }
   return (
     <div className="space-y-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
-      <p className="flex items-center gap-2 font-bold"><KeyRound className="size-5" /> Livraison bloquée : {vo.delivery_code_attempts} codes faux</p>
+      <p className="flex items-center gap-2 font-bold">
+        <KeyRound className="size-5" /> {vo.contested ? 'Livraison contestée par le client : paiement de la boutique gelé' : `Livraison bloquée : ${vo.delivery_code_attempts} codes faux`}
+      </p>
       {vo.client_report && (
-        <p className={`rounded-xl p-2 font-semibold ${vo.client_report === 'not_received' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>{vo.client_report_label}</p>
+        <p className={`rounded-xl p-2 font-semibold ${notReceived ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+          {vo.client_report_label}{vo.client_report_at && ` (${formatDate(vo.client_report_at)})`}
+          {notReceived && ' — seule sa confirmation peut valider la livraison.'}
+        </p>
       )}
+      {vo.confirmation_requested_at && <p>Confirmation demandée au client le {formatDate(vo.confirmation_requested_at)}.</p>}
       <p className="font-medium">Appelez d'abord le client, puis la boutique :</p>
       <div className="flex flex-wrap gap-4">
         <a href={`tel:${order.delivery_phone}`} className="font-semibold text-primary-dark">Client {order.client.name} · {formatPhone(order.delivery_phone)}</a>

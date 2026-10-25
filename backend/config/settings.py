@@ -216,6 +216,8 @@ REFERRAL_REWARD_GNF = 10_000
 # Un livreur qui doit plus que ce montant (espèces encaissées non reversées) ne prend plus de course en espèces
 RIDER_CASH_LIMIT = env.int("RIDER_CASH_LIMIT", default=2_000_000)
 DELIVERY_CODE_MAX_ATTEMPTS = 5
+# Réception validée par l'équipe (sans réponse du client) : délai pendant lequel le client peut contester
+DELIVERY_CONTEST_HOURS = 48
 # Temps laissé au livreur pour accepter une course proposée par une boutique
 DELIVERY_OFFER_MINUTES = 10
 
