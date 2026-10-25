@@ -173,7 +173,7 @@ function PickupAddressForm({ shop }: { shop: MyShop }) {
     pickup_quartier: shop.pickup_quartier,
     pickup_landmark: shop.pickup_landmark,
     pickup_phone: shop.pickup_phone,
-    pickup_hours: shop.pickup_hours,
+    pickup_hours: hoursText(parseHours(shop.pickup_hours)),
     pickup_latitude: shop.pickup_latitude,
     pickup_longitude: shop.pickup_longitude,
   })
@@ -238,10 +238,8 @@ function PickupAddressForm({ shop }: { shop: MyShop }) {
       </div>
       <Input label="Quartier" value={form.pickup_quartier} onChange={set('pickup_quartier')} required placeholder="Kipé" />
       <Textarea label="Repère précis" value={form.pickup_landmark} onChange={set('pickup_landmark')} required placeholder="Immeuble bleu face à la pharmacie, 1er étage" />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <PhoneInput label="Téléphone pour le livreur" value={form.pickup_phone} onValueChange={(pickup_phone) => setForm({ ...form, pickup_phone })} hint="Vide = votre numéro WhatsApp" />
-        <Input label="Horaires de retrait" value={form.pickup_hours} onChange={set('pickup_hours')} placeholder="Lun-Sam, 9 h - 19 h" />
-      </div>
+      <PhoneInput label="Téléphone pour le livreur" value={form.pickup_phone} onValueChange={(pickup_phone) => setForm({ ...form, pickup_phone })} hint="Vide = votre numéro WhatsApp" />
+      <HoursPicker value={form.pickup_hours} onChange={(pickup_hours) => setForm((f) => ({ ...f, pickup_hours }))} />
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <Button type="button" variant="outline" size="sm" loading={locating} onClick={locate}>
           <LocateFixed className="size-4" /> {form.pickup_latitude ? 'Mettre à jour ma position' : 'Je suis à la boutique : enregistrer ma position'}
@@ -251,5 +249,82 @@ function PickupAddressForm({ shop }: { shop: MyShop }) {
       <ErrorBox message={error} />
       <Button type="submit" loading={save.isPending}>{saved ? 'Enregistré ✓' : 'Enregistrer l’adresse'}</Button>
     </form>
+  )
+}
+
+const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+// Heures proposées : de 6 h à 23 h, toutes les demi-heures (en minutes depuis minuit)
+const TIMES = Array.from({ length: 35 }, (_, i) => 360 + i * 30)
+
+const formatTime = (minutes: number) => `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}`
+
+/** « Lun-Sam » pour des jours qui se suivent, sinon « Lun, Mer, Ven ». */
+function formatDays(days: number[]) {
+  const sorted = [...days].sort((a, b) => a - b)
+  if (sorted.length === 7) return 'Tous les jours'
+  const consecutive = sorted.length > 2 && sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1)
+  return consecutive ? `${DAYS[sorted[0]]}-${DAYS[sorted[sorted.length - 1]]}` : sorted.map((d) => DAYS[d]).join(', ')
+}
+
+/** Relit un horaire déjà enregistré (« Lun-Sam, 9 h - 19 h », « Lun -sam 10h à 18h »…) ; sinon valeurs par défaut. */
+function parseHours(text: string) {
+  const lower = text.toLowerCase()
+  const index = (abbr: string) => DAYS.findIndex((d) => d.toLowerCase() === abbr.slice(0, 3))
+  let days = [0, 1, 2, 3, 4, 5]
+  if (lower.includes('tous les jours')) days = [0, 1, 2, 3, 4, 5, 6]
+  else {
+    const range = lower.match(/([a-zé]{3})[a-zé]*\s*-\s*([a-zé]{3})/)
+    const found = [...lower.matchAll(/\b(lun|mar|mer|jeu|ven|sam|dim)/g)].map((m) => index(m[1]))
+    if (range && index(range[1]) >= 0 && index(range[2]) >= index(range[1])) {
+      days = Array.from({ length: index(range[2]) - index(range[1]) + 1 }, (_, i) => index(range[1]) + i)
+    } else if (found.length) days = found
+  }
+  const times = [...lower.matchAll(/(\d{1,2})\s*h\s*(\d{2})?/g)].map((m) => Number(m[1]) * 60 + Number(m[2] ?? 0))
+  return { days, open: times[0] ?? 540, close: times[1] ?? 1140 }
+}
+
+function hoursText({ days, open, close }: ReturnType<typeof parseHours>) {
+  return days.length ? `${formatDays(days)}, ${formatTime(open)} - ${formatTime(close)}` : ''
+}
+
+function HoursPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [state, setState] = useState(() => parseHours(value))
+  function update(next: typeof state) {
+    setState(next)
+    onChange(hoursText(next))
+  }
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-semibold">Horaires de retrait</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {DAYS.map((day, i) => {
+          const on = state.days.includes(i)
+          return (
+            <button
+              key={day}
+              type="button"
+              aria-pressed={on}
+              onClick={() => update({ ...state, days: on ? state.days.filter((d) => d !== i) : [...state.days, i] })}
+              className={`w-12 rounded-full py-1.5 text-sm font-semibold ring-1 transition ${on ? 'bg-ink text-white ring-ink' : 'ring-ink/15 hover:ring-ink/30'}`}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <span>De</span>
+        <select value={state.open} onChange={(e) => update({ ...state, open: Number(e.target.value), close: Math.max(state.close, Number(e.target.value) + 30) })} className="rounded-xl border border-ink/15 bg-surface px-3 py-2">
+          {TIMES.slice(0, -1).map((t) => <option key={t} value={t}>{formatTime(t)}</option>)}
+        </select>
+        <span>à</span>
+        <select value={state.close} onChange={(e) => update({ ...state, close: Number(e.target.value) })} className="rounded-xl border border-ink/15 bg-surface px-3 py-2">
+          {TIMES.filter((t) => t > state.open).map((t) => <option key={t} value={t}>{formatTime(t)}</option>)}
+        </select>
+      </div>
+      <p className="text-xs text-ink/60">
+        {state.days.length ? <>Le livreur verra : <strong>{formatDays(state.days)}, {formatTime(state.open)} - {formatTime(state.close)}</strong></> : 'Choisissez au moins un jour.'}
+      </p>
+    </fieldset>
   )
 }
