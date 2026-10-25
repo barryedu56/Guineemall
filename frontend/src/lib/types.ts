@@ -265,6 +265,8 @@ export interface SiteConfig {
   }
   payment_methods: { value: PaymentMethod; label: string; description: string }[]
   delivery_locations: { city: string; communes: string[] }[]
+  pickup_points: number
+  products_on_sale: number
   choices: {
     order_status: Choice[]
     payment_method: Choice[]

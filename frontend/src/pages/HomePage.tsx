@@ -81,7 +81,7 @@ function Hero() {
     config.delivery_locations.length > 0 && {
       icon: Truck,
       title: 'Livraison à domicile',
-      text: `${config.delivery_locations.length} ville${config.delivery_locations.length > 1 ? 's' : ''} desservie${config.delivery_locations.length > 1 ? 's' : ''}, ou en point relais`,
+      text: `${config.delivery_locations.length} ville${config.delivery_locations.length > 1 ? 's' : ''} desservie${config.delivery_locations.length > 1 ? 's' : ''}${config.pickup_points ? ', ou en point relais' : ''}`,
     },
   ].filter(Boolean) as { icon: typeof ShieldCheck; title: string; text: string }[]
 
@@ -100,9 +100,11 @@ function Hero() {
             <Link to="/produits" className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3.5 font-semibold text-white shadow-lift transition hover:bg-ink/90">
               Découvrir les produits <ArrowRight className="size-5" />
             </Link>
-            <Link to="/produits?on_sale=true" className="inline-flex items-center rounded-full bg-white/80 px-6 py-3.5 font-semibold text-ink backdrop-blur transition hover:bg-white">
-              Voir les promos
-            </Link>
+            {config.products_on_sale > 0 && (
+              <Link to="/produits?on_sale=true" className="inline-flex items-center rounded-full bg-white/80 px-6 py-3.5 font-semibold text-ink backdrop-blur transition hover:bg-white">
+                Voir les promos
+              </Link>
+            )}
           </div>
         </div>
       </div>

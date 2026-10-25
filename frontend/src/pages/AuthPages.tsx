@@ -17,7 +17,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
   const points = [
     { icon: ShieldCheck, text: `Paiement protégé jusqu'à la réception` },
     { icon: Smartphone, text: config?.payment_methods.map((m) => m.label).join(' · ') ?? '' },
-    { icon: Truck, text: 'Livraison à domicile ou en point relais' },
+    { icon: Truck, text: config?.pickup_points ? 'Livraison à domicile ou en point relais' : 'Livraison à domicile' },
   ]
   return (
     <div className="card mx-auto grid max-w-5xl overflow-hidden lg:grid-cols-2">

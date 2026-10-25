@@ -223,7 +223,7 @@ function ProductView({ product }: { product: ProductDetail }) {
               </div>
               <div className="flex gap-3 p-4">
                 <Truck className="size-6 shrink-0 text-primary-dark" />
-                <p className="text-sm"><span className="font-semibold">Livraison ou point relais.</span> Le prix exact dépend de votre commune et s'affiche avant de payer.</p>
+                <p className="text-sm"><span className="font-semibold">{config.pickup_points ? 'Livraison ou point relais.' : 'Livraison à domicile.'}</span> Le prix exact dépend de votre commune et s'affiche avant de payer.</p>
               </div>
             </div>
           )}

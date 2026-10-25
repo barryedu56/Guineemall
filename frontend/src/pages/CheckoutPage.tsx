@@ -110,7 +110,7 @@ export default function CheckoutPage() {
           <div className="mb-4 grid grid-cols-2 gap-2">
             {[
               { value: 'home' as const, label: 'À domicile', icon: MapPin },
-              { value: 'pickup' as const, label: 'Point relais (moins cher)', icon: Store },
+              ...(pickupPoints.length ? [{ value: 'pickup' as const, label: 'Point relais (moins cher)', icon: Store }] : []),
             ].map(({ value, label, icon: Icon }) => (
               <button
                 key={value}

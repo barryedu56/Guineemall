@@ -24,7 +24,7 @@ import { useCart } from '../context/cart'
 import { setCurrency, useCurrency, useSiteConfig } from '../context/settings'
 import { formatPhone } from '../lib/api'
 import type { Currency } from '../lib/prefs'
-import { useCategories } from '../lib/queries'
+import { useCategories, useLives } from '../lib/queries'
 import { ROLE_HOME } from '../lib/roles'
 import { useConversations } from '../pages/chat/useConversations'
 import NotificationBell from './NotificationBell'
@@ -262,19 +262,23 @@ export function Avatar({ name, className = 'size-8 text-xs' }: { name: string; c
 
 /** Catégories (depuis l'API) en barre défilante sous l'en-tête. */
 function CategoryBar() {
+  const { data: config } = useSiteConfig()
   const { data: categories = [] } = useCategories()
+  const { data: lives = [] } = useLives()
   const { pathname, search } = useLocation()
   const active = pathname === '/produits' ? new URLSearchParams(search).get('category') : null
   if (!categories.length) return null
   return (
     <nav className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2">
-      <CategoryLink to="/produits?on_sale=true" active={pathname === '/produits' && search.includes('on_sale')}>🔥 Promos</CategoryLink>
+      {!!config?.products_on_sale && (
+        <CategoryLink to="/produits?on_sale=true" active={pathname === '/produits' && search.includes('on_sale')}>🔥 Promos</CategoryLink>
+      )}
       {categories.filter((c) => c.products_count > 0).map((c) => (
         <CategoryLink key={c.slug} to={`/produits?category=${c.slug}`} active={active === c.slug}>
           {c.name}
         </CategoryLink>
       ))}
-      <CategoryLink to="/lives" active={pathname.startsWith('/lives')}>🔴 Directs</CategoryLink>
+      {lives.length > 0 && <CategoryLink to="/lives" active={pathname.startsWith('/lives')}>🔴 Directs</CategoryLink>}
     </nav>
   )
 }
@@ -358,6 +362,7 @@ const SOCIAL_LABELS = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'T
 function Footer() {
   const { data: config } = useSiteConfig()
   const { data: categories = [] } = useCategories()
+  const { data: lives = [] } = useLives()
   const site = config?.site
   const digits = site?.contact_whatsapp?.replace(/\D/g, '') ?? ''
   const whatsapp = digits ? digits.replace(/^(?!224)/, '224') : null
@@ -378,11 +383,11 @@ function Footer() {
         </div>
 
         <FooterColumn title="Acheter">
-          {categories.slice(0, 5).map((c) => (
+          {categories.filter((c) => c.products_count > 0).slice(0, 5).map((c) => (
             <Link key={c.slug} to={`/produits?category=${c.slug}`} className="hover:text-white">{c.name}</Link>
           ))}
-          <Link to="/produits?on_sale=true" className="hover:text-white">Promotions</Link>
-          <Link to="/lives" className="hover:text-white">Ventes en direct</Link>
+          {!!config?.products_on_sale && <Link to="/produits?on_sale=true" className="hover:text-white">Promotions</Link>}
+          {lives.length > 0 && <Link to="/lives" className="hover:text-white">Ventes en direct</Link>}
         </FooterColumn>
 
         <FooterColumn title="Gagner avec nous">

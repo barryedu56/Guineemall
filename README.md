@@ -79,7 +79,9 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
-### Données de démonstration
+### Données de démonstration (développement uniquement)
+⚠️ Ne pas lancer sur une base contenant de vraies données : la commande crée des comptes, boutiques,
+statuts et tarifs fictifs.
 ```bash
 cd backend && .venv/bin/python manage.py seed_demo
 ```
@@ -152,6 +154,31 @@ Sans jeton, les messages sont seulement écrits dans les logs du worker Celery.
 - Nginx : `/api`, `/admin`, `/media`, `/static` → Django ; `/ws` → Django en WebSocket ; le reste → `frontend/dist`
 - Celery worker + beat en service (systemd ou supervisor)
 - Sauvegarde quotidienne de PostgreSQL et du dossier `media/`
+
+## Sécurité
+
+| Protection | Où |
+|---|---|
+| Fichiers envoyés reconnus à leur **contenu réel** (HTML/SVG déguisés refusés), renommés au hasard | `apps/core/uploads.py` |
+| **Pièces d'identité** en stockage privé (`private_media/`), lisibles par l'équipe seulement, consultations tracées | `apps/core/storage.py`, `private_views.py` |
+| **Limitation des tentatives** : connexion (par IP et par compte), inscription, codes promo, retraits, messages… | `apps/core/throttling.py` |
+| Jetons courts (15 min), **rotation + révocation**, vraie déconnexion, déconnexion de tous les appareils au changement de mot de passe | `SIMPLE_JWT` |
+| **Double authentification** obligatoire pour l'équipe ; page de connexion de l'admin Django fermée ; adresse de l'admin secrète (`ADMIN_URL`) | `apps/accounts/two_factor.py` |
+| **Journal d'audit** en lecture seule (argent, validations, sécurité) + alertes à l'équipe | `apps/core/audit.py` |
+| En-têtes de sécurité, CSP, HTTPS/HSTS | `deploy/nginx.conf`, `settings.py` |
+
+Avant la mise en ligne : `DEBUG=False`, un vrai `SECRET_KEY`, `ADMIN_URL` difficile à deviner, puis
+`python manage.py check --deploy` (doit être propre).
+
+**Première connexion de l'admin :** le tableau de bord demande d'activer la double authentification
+(scanner le QR code avec Google Authenticator, Microsoft Authenticator ou Authy). Gardez la clé affichée
+en lieu sûr : sans le téléphone, elle permet de réinstaller le compte dans l'application.
+
+## Sauvegardes
+
+`deploy/backup.sh` sauvegarde chaque nuit la base et les fichiers (chiffrés, conservés 14 jours) ;
+la restauration est indiquée en fin de script. Le dossier `backups/` (non versionné) contient la
+sauvegarde faite avant le nettoyage de la base du 25/10/2026.
 
 ## Langues locales
 

@@ -1,9 +1,11 @@
 from django.conf import settings
+from django.db.models import F
 from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from apps.delivery.models import DeliveryZone
+from apps.catalog.views import public_products
+from apps.delivery.models import DeliveryZone, PickupPoint
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Coupon
 from apps.vendors.models import VerificationRequest
@@ -74,6 +76,8 @@ def site_config(request):
             for m in site.enabled_payment_methods()
         ],
         "delivery_locations": [{"city": city, "communes": communes} for city, communes in locations.items()],
+        "pickup_points": PickupPoint.objects.filter(is_active=True).count(),
+        "products_on_sale": public_products().filter(compare_at_price__gt=F("price")).count(),
         "choices": {
             "order_status": choices(Order.Status),
             "payment_method": choices(Order.PaymentMethod),
