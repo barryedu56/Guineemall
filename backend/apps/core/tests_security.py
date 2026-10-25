@@ -45,7 +45,8 @@ class UploadAttackTests(GuineeMallTestCase):
         r = self.client.post(f"/api/conversations/{conv['id']}/messages/", {"attachment": image_file("mon-nom.png")}, format="multipart")
         self.assertEqual(r.status_code, 201)
         self.assertNotIn("mon-nom", r.data["attachment"])
-        self.assertRegex(r.data["attachment"], r"/chat/[0-9a-f]{32}\.png$")
+        # Nom aléatoire ; image réenregistrée en JPEG (ou WebP si transparente)
+        self.assertRegex(r.data["attachment"], r"/chat/[0-9a-f]{32}\.(jpg|webp)$")
 
     def test_pieces_d_identite_privees(self):
         # Le stockage privé est créé au chargement du modèle : on le redirige vers un dossier de test
@@ -123,3 +124,71 @@ class TwoFactorTests(GuineeMallTestCase):
         self.assertEqual(r.status_code, 302)
         self.assertIn("/connexion?suivant=/administration", r["Location"])
         self.assertNotEqual(self.client.get(f"/{settings.ADMIN_URL}").status_code, 200)  # pas de session ouverte
+
+
+def photo(fmt, size=(64, 48), mode="RGB", **save):
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new(mode, size, (200, 120, 30, 128) if mode == "RGBA" else (200, 120, 30)).save(buffer, format=fmt, **save)
+    return buffer.getvalue()
+
+
+@override_settings(MEDIA_ROOT="/tmp/claude-1000/guineemall-test-media")
+class ImageFormatTests(GuineeMallTestCase):
+    """Les vraies photos de téléphone sont acceptées et nettoyées ; les faux fichiers refusés."""
+
+    def setUp(self):
+        super().setUp()
+        self.vendor = self.make_vendor()
+        self.product = self.make_product(self.vendor)
+        self.client.force_authenticate(self.vendor.user)
+
+    def upload(self, name, data, ctype="image/jpeg"):
+        return self.client.post(
+            f"/api/vendor/products/{self.product.pk}/images/",
+            {"image": SimpleUploadedFile(name, data, content_type=ctype)}, format="multipart",
+        )
+
+    def saved(self, r):
+        from PIL import Image
+
+        from apps.catalog.models import ProductImage
+
+        return Image.open(ProductImage.objects.get(pk=r.data["id"]).image.path)
+
+    def test_photo_iphone_heic(self):
+        from pillow_heif import register_heif_opener
+
+        register_heif_opener()
+        r = self.upload("IMG_0001.HEIC", photo("HEIF"), "image/heic")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(self.saved(r).format, "JPEG")
+
+    def test_photo_avif_gif_bmp(self):
+        for fmt in ("AVIF", "GIF", "BMP"):
+            r = self.upload(f"photo.{fmt.lower()}", photo(fmt))
+            self.assertEqual(r.status_code, 201, (fmt, r.data))
+
+    def test_grande_photo_reduite_et_position_gps_effacee(self):
+        from PIL import Image
+
+        exif = Image.Exif()
+        exif[0x8825] = {1: "N", 2: (9.0, 31.0, 0.0)}  # position GPS (Conakry)
+        r = self.upload("grande.jpg", photo("JPEG", size=(5000, 3000), exif=exif))
+        self.assertEqual(r.status_code, 201, r.data)
+        image = self.saved(r)
+        self.assertEqual(max(image.size), 2048)
+        self.assertNotIn(0x8825, image.getexif())
+
+    def test_transparence_conservee(self):
+        r = self.upload("logo.png", photo("PNG", mode="RGBA"))
+        self.assertEqual(self.saved(r).format, "WEBP")
+
+    def test_faux_fichiers_refuses_avec_message_clair(self):
+        r = self.upload("logo.svg", b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', "image/svg+xml")
+        self.assertEqual(r.status_code, 400)
+        r = self.upload("photo.jpg", b"<html><script>alert(1)</script></html>")
+        self.assertEqual(r.status_code, 400)

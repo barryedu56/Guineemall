@@ -68,4 +68,4 @@ class AdminDashboardTests(TransactionTestCase):
         self.assertEqual(api.get("/admin/").status_code, 200)  # admin Django accessible sans 2e connexion
 
 
-from .tests_security import BruteForceTests, TwoFactorTests, UploadAttackTests  # noqa: E402,F401
+from .tests_security import BruteForceTests, ImageFormatTests, TwoFactorTests, UploadAttackTests  # noqa: E402,F401
