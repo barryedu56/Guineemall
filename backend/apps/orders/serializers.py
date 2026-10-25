@@ -8,6 +8,7 @@ from apps.catalog.serializers import ProductListSerializer
 
 from .models import CartItem, Order, OrderItem, OrderStatusHistory, VendorOrder
 from .services import VENDOR_ORDER_TRANSITIONS
+from .timeline import vendor_order_timeline
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -89,7 +90,8 @@ def tracking(vendor_order, with_rating=False):
     delivery = getattr(vendor_order, "delivery", None)
     if delivery is None or delivery.status == "cancelled":
         return None
-    rider = delivery.rider
+    # Le livreur n'est présenté au client qu'une fois qu'il a accepté la course
+    rider = delivery.rider if delivery.status in ("assigned", "picked_up", "delivered") else None
     extra = {}
     if with_rating and rider:
         given = DeliveryRating.objects.filter(delivery=delivery).values_list("rating", flat=True).first()
@@ -98,7 +100,7 @@ def tracking(vendor_order, with_rating=False):
         **extra,
         "delivery_id": delivery.id,
         "status": delivery.status,
-        "status_label": delivery.get_status_display(),
+        "status_label": delivery.get_status_display() if rider else "La boutique choisit votre livreur",
         "rider_name": rider.user.name if rider else None,
         "rider_phone": rider.user.phone if rider else None,
         "latitude": rider.latitude if rider else None,
@@ -113,13 +115,17 @@ class VendorOrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     tracking = serializers.SerializerMethodField()
     delivery_code = serializers.SerializerMethodField()
+    timeline = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorOrder
         fields = [
             "id", "shop_name", "shop_slug", "subtotal", "delivery_fee", "vendor_discount", "platform_discount",
-            "total_amount", "status", "status_label", "received_at", "items", "tracking", "delivery_code",
+            "total_amount", "status", "status_label", "received_at", "items", "tracking", "delivery_code", "timeline",
         ]
+
+    def get_timeline(self, vendor_order):
+        return vendor_order_timeline(vendor_order)
 
     def get_tracking(self, vendor_order):
         return tracking(vendor_order, with_rating=True)
@@ -186,17 +192,20 @@ class VendorSideOrderSerializer(serializers.ModelSerializer):
     delivery_method = serializers.CharField(source="order.delivery_method", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
     delivery = serializers.SerializerMethodField()
-    tracking = serializers.SerializerMethodField()
+    pickup_point = serializers.SerializerMethodField()
+    courier = serializers.SerializerMethodField()
+    timeline = serializers.SerializerMethodField()
     next_statuses = serializers.SerializerMethodField()
     net_amount = serializers.SerializerMethodField()
+    cash_to_collect = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorOrder
         fields = [
             "id", "order_id", "client_name", "subtotal", "delivery_fee", "vendor_discount", "total_amount",
-            "net_amount", "status", "status_label", "payment_method", "payment_method_label", "payment_status",
-            "delivery_method",
-            "items", "delivery", "tracking", "next_statuses", "received_at", "funds_released_at", "created_at",
+            "net_amount", "cash_to_collect", "status", "status_label", "payment_method", "payment_method_label",
+            "payment_status", "delivery_method", "pickup_point",
+            "items", "delivery", "courier", "timeline", "next_statuses", "received_at", "funds_released_at", "created_at",
         ]
 
     def get_delivery(self, vendor_order):
@@ -204,8 +213,25 @@ class VendorSideOrderSerializer(serializers.ModelSerializer):
         data["name"] = vendor_order.order.delivery_name or vendor_order.order.user.name
         return data
 
-    def get_tracking(self, vendor_order):
-        return tracking(vendor_order)
+    def get_pickup_point(self, vendor_order):
+        point = vendor_order.order.pickup_point
+        return point and {"name": point.name, "address": point.address, "commune": point.commune,
+                          "phone": point.phone, "opening_hours": point.opening_hours}
+
+    def get_courier(self, vendor_order):
+        from apps.delivery.serializers import delivery_for_vendor
+
+        delivery = getattr(vendor_order, "delivery", None)
+        if delivery is not None and delivery.status == "cancelled":
+            delivery = None
+        return delivery_for_vendor(delivery, self.context["request"].user)
+
+    def get_timeline(self, vendor_order):
+        return vendor_order_timeline(vendor_order)
+
+    def get_cash_to_collect(self, vendor_order):
+        cash = vendor_order.order.payment_method == Order.PaymentMethod.CASH_ON_DELIVERY
+        return vendor_order.total_amount if cash and vendor_order.status not in ("delivered", "cancelled") else 0
 
     def get_net_amount(self, vendor_order):
         """Ce que la boutique touchera pour les articles, après sa réduction et la commission."""
@@ -215,6 +241,10 @@ class VendorSideOrderSerializer(serializers.ModelSerializer):
 
     def get_next_statuses(self, vendor_order):
         return VENDOR_ORDER_TRANSITIONS[vendor_order.status]
+
+
+class AssignRiderSerializer(serializers.Serializer):
+    rider = serializers.IntegerField()
 
 
 class VendorOrderStatusSerializer(serializers.Serializer):

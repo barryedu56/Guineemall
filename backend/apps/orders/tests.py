@@ -101,7 +101,7 @@ class VendorOrderTests(OrderTestCase):
             return self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status, **({"code": VendorOrder.objects.get(pk=vo.pk).delivery_code} if new_status == "delivered" else {})})
 
     def test_parcours_complet_jusqu_a_livree(self):
-        for s in ["confirmed", "preparing", "ready", "delivered"]:
+        for s in ["preparing", "ready", "delivered"]:
             self.assertEqual(self.set_status(self.kipe, self.vo_kipe, s).status_code, 200)
         self.set_status(self.madina, self.vo_madina, "cancelled")
         order = Order.objects.get(pk=self.order_id)
@@ -112,7 +112,7 @@ class VendorOrderTests(OrderTestCase):
         self.assertEqual(r.status_code, 400)
 
     def test_commande_passe_en_cours_des_qu_une_boutique_confirme(self):
-        self.set_status(self.kipe, self.vo_kipe, "confirmed")
+        self.set_status(self.kipe, self.vo_kipe, "preparing")
         self.assertEqual(Order.objects.get(pk=self.order_id).status, "processing")
 
     def test_annulation_vendeur_remet_le_stock(self):
@@ -121,14 +121,14 @@ class VendorOrderTests(OrderTestCase):
         self.assertEqual(self.riz.stock, 3)
 
     def test_vendeur_ne_touche_pas_aux_commandes_des_autres(self):
-        r = self.set_status(self.kipe, self.vo_madina, "confirmed")
+        r = self.set_status(self.kipe, self.vo_madina, "preparing")
         self.assertEqual(r.status_code, 404)
 
     def test_vendeur_voit_l_adresse_de_livraison(self):
         self.client.force_authenticate(self.kipe.user)
         data = self.client.get("/api/vendor/orders/").data["results"][0]
         self.assertEqual(data["delivery"]["quartier"], "Kipé")
-        self.assertEqual(data["next_statuses"], ["confirmed", "cancelled"])
+        self.assertEqual(data["next_statuses"], ["preparing", "cancelled"])
 
 
 class OwnShopTests(OrderTestCase):

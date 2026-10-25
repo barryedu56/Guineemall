@@ -1,8 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bike, CheckCircle2, Clock, KeyRound, MapPin, Package, Phone, Star, XCircle } from 'lucide-react'
+import { Bike, CheckCircle2, Clock, KeyRound, MapPin, Package, Star, XCircle } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
+import { ContactButtons, Timeline } from '../components/Delivery'
 import Price from '../components/Price'
 import { StarInput } from '../components/Stars'
 import { Button, Empty, ErrorBox, PageHeader, Pager, PhoneInput, Spinner, StatusBadge } from '../components/ui'
@@ -220,21 +221,29 @@ export function OrderDetailPage() {
             {vo.tracking?.status === 'delivered' && vo.tracking.rider_name && (
               <RateRider deliveryId={vo.tracking.delivery_id} riderName={vo.tracking.rider_name} given={vo.tracking.my_rating ?? null} orderKey={key} />
             )}
-            {vo.tracking && vo.tracking.status !== 'open' && vo.tracking.status !== 'delivered' && (
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-background p-3 text-sm">
-                <Bike className="size-5 text-primary-dark" />
-                <span className="font-medium">{vo.tracking.status_label}</span>
-                {vo.tracking.rider_name && <span>· {vo.tracking.rider_name}</span>}
-                {vo.tracking.rider_rating && <span className="text-ink/60">★ {vo.tracking.rider_rating}</span>}
-                {vo.tracking.rider_phone && (
-                  <a href={`tel:${vo.tracking.rider_phone}`} className="flex items-center gap-1 text-primary-dark"><Phone className="size-4" /> Appeler</a>
-                )}
-                {position && vo.tracking.status === 'picked_up' && (
-                  <a href={`https://www.google.com/maps?q=${position.latitude},${position.longitude}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-primary-dark underline">
-                    <MapPin className="size-4" /> Voir où est le livreur
-                  </a>
-                )}
+            {vo.tracking?.rider_name && vo.tracking.status !== 'delivered' && (
+              <div className="mt-3 space-y-2 rounded-xl bg-background p-3 text-sm">
+                <p className="flex flex-wrap items-center gap-2">
+                  <Bike className="size-5 text-primary-dark" />
+                  <span className="font-medium">{vo.tracking.status_label}</span>
+                  <span>· {vo.tracking.rider_name}</span>
+                  {vo.tracking.rider_rating && <span className="text-ink/60">★ {vo.tracking.rider_rating}</span>}
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ContactButtons phone={vo.tracking.rider_phone} message={`Bonjour, c'est pour ma commande #${order.id}.`} />
+                  {position && vo.tracking.status === 'picked_up' && (
+                    <a href={`https://www.google.com/maps?q=${position.latitude},${position.longitude}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-primary-dark underline">
+                      <MapPin className="size-4" /> Voir où est le livreur
+                    </a>
+                  )}
+                </div>
               </div>
+            )}
+            {vo.timeline.length > 0 && (
+              <details className="mt-3 rounded-xl bg-background p-3" open={vo.status !== 'delivered' && vo.status !== 'cancelled'}>
+                <summary className="cursor-pointer text-sm font-semibold">Suivi de la livraison</summary>
+                <div className="mt-3"><Timeline steps={vo.timeline} /></div>
+              </details>
             )}
           </section>
         )
@@ -259,21 +268,6 @@ export function OrderDetailPage() {
           <p className="text-ink/60">{order.payment_status_label}</p>
         </dl>
       </section>
-
-      {order.status_history.length > 0 && (
-        <section className="card p-5">
-          <h2 className="mb-4 font-bold">Suivi</h2>
-          <ol className="relative space-y-4 border-l-2 border-ink/10 pl-6">
-            {order.status_history.map((h, i) => (
-              <li key={i} className="relative">
-                <span className={`absolute -left-[31px] top-1 size-4 rounded-full ring-4 ring-surface ${i === order.status_history.length - 1 ? 'bg-primary-dark' : 'bg-ink/20'}`} />
-                <p className="font-semibold">{h.note || config?.choices.order_status.find((c) => c.value === h.status)?.label || h.status}</p>
-                <p className="text-sm text-ink/55">{formatDate(h.created_at)}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
 
       <ErrorBox message={error} />
       {cancellable && (

@@ -20,13 +20,13 @@ import PaymentSimulationPage from './pages/PaymentSimulationPage'
 import ProductPage from './pages/ProductPage'
 import ProductsPage from './pages/ProductsPage'
 import { CampaignPage, ReferralPage } from './pages/PromoPages'
-import { RiderDashboard, RiderRegisterPage } from './pages/RiderPages'
+import { RiderDashboard, RiderDeliveryPage, RiderRegisterPage } from './pages/RiderPages'
 import ShopPage from './pages/ShopPage'
 import ShopSettingsPage from './pages/vendor/ShopSettingsPage'
 import VendorDashboard from './pages/vendor/VendorDashboard'
 import VendorLayout from './pages/vendor/VendorLayout'
 import { VendorCouponsPage, VendorLivesPage, VendorReviewsPage } from './pages/vendor/VendorMarketingPages'
-import VendorOrdersPage from './pages/vendor/VendorOrdersPage'
+import VendorOrdersPage, { VendorOrderDetailPage } from './pages/vendor/VendorOrdersPage'
 import VendorProductsPage from './pages/vendor/VendorProductsPage'
 import VendorStatutsPage from './pages/vendor/VendorStatutsPage'
 import NotFound from './pages/NotFound'
@@ -63,6 +63,7 @@ export default function App() {
           <Route path="/parrainage" element={<RequireAuth><ReferralPage /></RequireAuth>} />
           <Route path="/portefeuille" element={<RequireAuth><WalletPage /></RequireAuth>} />
           <Route path="/livreur" element={<RequireAuth role="livreur"><RiderDashboard /></RequireAuth>} />
+          <Route path="/livreur/courses/:id" element={<RequireAuth role="livreur"><RiderDeliveryPage /></RequireAuth>} />
           <Route path="/administration" element={<RequireAuth role="admin"><AdminLayout /></RequireAuth>}>
             <Route index element={<AdminDashboard />} />
             <Route path="commandes" element={<AdminOrders />} />
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/vendeur" element={<RequireAuth role="vendeur"><VendorLayout /></RequireAuth>}>
             <Route index element={<VendorDashboard />} />
             <Route path="commandes" element={<VendorOrdersPage />} />
+            <Route path="commandes/:id" element={<VendorOrderDetailPage />} />
             <Route path="produits" element={<VendorProductsPage />} />
             <Route path="messages" element={<ChatPage base="/vendeur/messages" />} />
             <Route path="messages/:id" element={<ChatPage base="/vendeur/messages" />} />

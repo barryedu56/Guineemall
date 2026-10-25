@@ -42,6 +42,15 @@ export interface Shop {
 
 export interface MyShop extends Shop {
   status: VendorStatus
+  pickup_city: string
+  pickup_commune: string
+  pickup_quartier: string
+  pickup_landmark: string
+  pickup_phone: string
+  pickup_hours: string
+  pickup_latitude: string | null
+  pickup_longitude: string | null
+  has_pickup_address: boolean
 }
 
 export interface Category {
@@ -129,6 +138,13 @@ export interface OrderItem {
   subtotal: number
 }
 
+export interface TimelineStep {
+  key: string
+  label: string
+  at: string | null
+  done: boolean
+}
+
 export interface Tracking {
   delivery_id: number
   rider_rating?: number | null
@@ -177,8 +193,47 @@ export interface Order {
     items: OrderItem[]
     tracking: Tracking | null
     delivery_code: string | null
+    timeline: TimelineStep[]
   }[]
   status_history: { status: string; note: string; created_at: string }[]
+  created_at: string
+}
+
+export type DeliveryStatus = 'open' | 'offered' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled'
+
+export interface Courier {
+  id: number
+  status: DeliveryStatus
+  status_label: string
+  fee: number
+  offer_expires_at: string | null
+  unread: number
+  rider: { id: number; name: string; phone: string; avatar: string | null; vehicle_plate: string; rating: number | null } | null
+}
+
+export interface CandidateRider {
+  id: number
+  name: string
+  phone: string
+  avatar: string | null
+  vehicle_plate: string
+  communes: string
+  rating: number | null
+  done: number
+  done_for_shop: number
+  busy: number
+  declined: boolean
+  cash_blocked: boolean
+}
+
+export interface DeliveryMessage {
+  id: number
+  sender: number
+  sender_name: string
+  mine: boolean
+  content: string
+  image: string | null
+  read_at: string | null
   created_at: string
 }
 
@@ -191,6 +246,7 @@ export interface VendorSideOrder {
   vendor_discount: number
   total_amount: number
   net_amount: number
+  cash_to_collect: number
   status: VendorOrderStatus
   status_label: string
   payment_method: PaymentMethod
@@ -198,7 +254,9 @@ export interface VendorSideOrder {
   payment_status: string
   delivery_method: 'home' | 'pickup'
   items: OrderItem[]
-  tracking: Tracking | null
+  pickup_point: { name: string; address: string; commune: string; phone: string; opening_hours: string } | null
+  courier: Courier | null
+  timeline: TimelineStep[]
   received_at: string | null
   funds_released_at: string | null
   delivery: {
@@ -271,6 +329,8 @@ export interface SiteConfig {
     order_status: Choice[]
     payment_method: Choice[]
     vendor_order_status: (Choice & { action: string })[]
+    vendor_order_step: Choice[]
+    delivery_status: Choice[]
     document_type: Choice[]
     payout_method: Choice[]
     deposit_method: Choice[]
@@ -292,6 +352,7 @@ export interface SiteConfig {
   escrow_days: number
   unpaid_timeout_minutes: number
   rider_cash_limit: number
+  delivery_offer_minutes: number
   page_size: number
 }
 
@@ -475,14 +536,26 @@ export interface CashDeposit {
 
 export interface RiderDelivery {
   id: number
-  cash_blocked?: boolean
   order_id: number
-  status: 'open' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled'
+  status: DeliveryStatus
   status_label: string
   fee: number
   cash_to_collect: number
+  items: { name: string; quantity: number }[]
   items_count: number
-  pickup: { shop_name: string; phone: string }
+  pickup: {
+    shop_name: string
+    logo: string | null
+    phone: string
+    whatsapp: string
+    city: string
+    commune: string
+    quartier: string
+    landmark: string
+    hours: string
+    latitude: string | null
+    longitude: string | null
+  }
   dropoff: {
     city: string
     commune: string
@@ -493,6 +566,9 @@ export interface RiderDelivery {
     latitude: string | null
     longitude: string | null
   }
+  offer_expires_at: string | null
+  timeline: TimelineStep[]
+  unread: number
   created_at: string
 }
 

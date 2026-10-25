@@ -23,7 +23,7 @@ def balance(user):
 @override_settings(PAYMENT_MODE="simulation", PLATFORM_COMMISSION_RATE=RATE, AFFILIATE_COMMISSION_RATE=0.02)
 class EscrowTests(OrderTestCase):
     def deliver(self, vendor, vo):
-        for s in ["confirmed", "preparing", "ready", "delivered"]:
+        for s in ["preparing", "ready", "delivered"]:
             self.set_status(vendor, vo, s)
 
     def set_status(self, vendor, vo, new_status):
@@ -70,11 +70,13 @@ class EscrowTests(OrderTestCase):
         self.add(self.riz, 1)
         self.checkout()
         vo = VendorOrder.objects.get(vendor=self.madina)
-        for s in ["confirmed", "preparing", "ready"]:
+        for s in ["preparing", "ready"]:
             self.set_status(self.madina, vo, s)
         rider_user = User.objects.create_user(email="moto@test.gn", password="x", name="Ibrahima", role="livreur")
         rider = Rider.objects.create(user=rider_user, is_approved=True)
         delivery = Delivery.objects.get(vendor_order=vo)
+        self.client.force_authenticate(self.madina.user)
+        self.client.post(f"/api/vendor/orders/{vo.pk}/assign/", {"rider": rider.pk})
         self.client.force_authenticate(rider_user)
         self.client.post(f"/api/rider/deliveries/{delivery.pk}/accept/")
         self.client.post(f"/api/rider/deliveries/{delivery.pk}/pickup/")

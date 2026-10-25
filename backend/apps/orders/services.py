@@ -37,10 +37,12 @@ class OrderError(Exception):
     """Erreur métier affichable telle quelle au client."""
 
 
+# Côté boutique, deux gestes seulement : « Accepter » (la préparation commence) puis « Colis prêt ».
+# « Confirmée » n'est plus utilisé que par les anciennes commandes.
 VENDOR_ORDER_TRANSITIONS = {
-    VendorOrder.Status.PENDING: [VendorOrder.Status.CONFIRMED, VendorOrder.Status.CANCELLED],
+    VendorOrder.Status.PENDING: [VendorOrder.Status.PREPARING, VendorOrder.Status.CANCELLED],
     VendorOrder.Status.CONFIRMED: [VendorOrder.Status.PREPARING, VendorOrder.Status.CANCELLED],
-    VendorOrder.Status.PREPARING: [VendorOrder.Status.READY],
+    VendorOrder.Status.PREPARING: [VendorOrder.Status.READY, VendorOrder.Status.CANCELLED],
     VendorOrder.Status.READY: [VendorOrder.Status.DELIVERED],
     VendorOrder.Status.DELIVERED: [],
     VendorOrder.Status.CANCELLED: [],
@@ -277,7 +279,7 @@ def announce_order(order):
            "Les boutiques vont la confirmer et vous appeler pour la livraison.", f"/commandes/{order.id}")
     for vo in order.vendor_orders.select_related("vendor__user"):
         notify(vo.vendor.user, "order", f"Nouvelle commande #{order.id} 🛍️",
-               f"{vo.items.count()} article(s) – {gnf(vo.total_amount)}. Confirmez-la rapidement.", "/vendeur/commandes?statut=pending")
+               f"{vo.items.count()} article(s) – {gnf(vo.total_amount)}. Acceptez-la rapidement.", f"/vendeur/commandes/{vo.id}")
 
 
 @transaction.atomic
@@ -366,7 +368,7 @@ def cancel_order(order, user):
         _restore_stock(vendor_order)
         if is_visible_to_vendor(order):
             notify(vendor_order.vendor.user, "order", f"Commande #{order.id} annulée",
-                   "Le client a annulé sa commande.", "/vendeur/commandes?statut=cancelled", whatsapp=False)
+                   "Le client a annulé sa commande.", f"/vendeur/commandes/{vendor_order.id}", whatsapp=False)
 
     _flag_refund(order)
     _sync_order_status(order, user)
@@ -391,32 +393,39 @@ def update_vendor_order_status(vendor_order, new_status, user, code_checked=Fals
 
     if new_status == VendorOrder.Status.DELIVERED and not code_checked:
         raise OrderError("Saisissez le code de livraison donné par le client.")
+    home = order.delivery_method == Order.DeliveryMethod.HOME
+    if new_status == VendorOrder.Status.READY and home and not vendor_order.vendor.has_pickup_address:
+        raise OrderError(
+            "Renseignez d'abord l'adresse de retrait de votre boutique (Ma boutique → Adresse de retrait) : "
+            "le livreur doit savoir où venir chercher le colis."
+        )
 
     vendor_order.status = new_status
     fields = ["status", "updated_at"]
+    now = timezone.now()
+    if new_status == VendorOrder.Status.PREPARING:
+        vendor_order.accepted_at = now
+        fields.append("accepted_at")
     if new_status == VendorOrder.Status.READY:
+        vendor_order.ready_at = now
         vendor_order.delivery_code = new_delivery_code()
         vendor_order.delivery_code_attempts = 0
-        fields += ["delivery_code", "delivery_code_attempts"]
+        fields += ["ready_at", "delivery_code", "delivery_code_attempts"]
     if new_status == VendorOrder.Status.DELIVERED:
-        vendor_order.delivered_at = timezone.now()
+        vendor_order.delivered_at = now
         fields.append("delivered_at")
     vendor_order.save(update_fields=fields)
 
     if new_status == VendorOrder.Status.CANCELLED:
         _restore_stock(vendor_order)
         _flag_refund(order)
-    if new_status == VendorOrder.Status.READY and order.delivery_method == Order.DeliveryMethod.HOME:
-        # Course proposée aux livreurs GuinéeMall (la boutique peut aussi livrer elle-même)
-        delivery, created = Delivery.objects.get_or_create(vendor_order=vendor_order, defaults={"fee": vendor_order.delivery_fee})
-        if created:
-            from apps.delivery.services import announce_to_riders
-
-            transaction.on_commit(lambda: announce_to_riders(delivery))
+    if new_status == VendorOrder.Status.READY and home:
+        # Course créée : c'est la boutique qui choisit ensuite son livreur (ou livre elle-même)
+        Delivery.objects.get_or_create(vendor_order=vendor_order, defaults={"fee": vendor_order.delivery_fee})
     if new_status == VendorOrder.Status.DELIVERED:
-        # La boutique a livré elle-même : la course est retirée (et le livreur prévenu s'il l'avait acceptée)
+        # La boutique a livré elle-même : la course est retirée (et le livreur prévenu s'il l'avait)
         for delivery in Delivery.objects.filter(
-            vendor_order=vendor_order, status__in=[Delivery.Status.OPEN, Delivery.Status.ASSIGNED]
+            vendor_order=vendor_order, status__in=[Delivery.Status.OPEN, Delivery.Status.OFFERED, Delivery.Status.ASSIGNED]
         ).select_related("rider__user"):
             delivery.status = Delivery.Status.CANCELLED
             delivery.save(update_fields=["status", "updated_at"])
@@ -431,7 +440,7 @@ def update_vendor_order_status(vendor_order, new_status, user, code_checked=Fals
     _sync_order_status(order, user)
 
     messages = {
-        VendorOrder.Status.CONFIRMED: "a confirmé votre commande.",
+        VendorOrder.Status.PREPARING: "a accepté votre commande et la prépare.",
         VendorOrder.Status.READY: "a préparé votre colis, il part bientôt.",
         VendorOrder.Status.DELIVERED: "indique que votre colis est livré.",
         VendorOrder.Status.CANCELLED: "a annulé sa partie de votre commande.",

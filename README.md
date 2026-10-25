@@ -114,6 +114,15 @@ Pour la production, il faut renseigner les clés dans `.env` et passer `PAYMENT_
 Les appels de retour des opérateurs ne sont jamais crus sur parole : ils déclenchent une vérification
 du statut directement auprès de l'opérateur.
 
+### Circuit d'une commande
+1. **Boutique** : « Accepter la commande » (la préparation commence), puis « Le colis est prêt ».
+2. **Boutique** : choisit un livreur parmi ceux qui desservent sa zone (ses livreurs habituels en premier).
+   La course est proposée à ce livreur seulement ; il a 10 minutes pour accepter ou refuser.
+   Aucun livreur ne voit une course qu'on ne lui a pas proposée. La boutique peut aussi livrer elle-même.
+3. **Livreur** : voit l'adresse de retrait de la boutique (à remplir dans Ma boutique), l'appelle ou lui écrit
+   (WhatsApp, ou la discussion propre à la course), récupère le colis, puis le remet contre le code du client.
+4. Boutique, livreur et client suivent les mêmes étapes, mises à jour en direct.
+
 ### Comment circule l'argent
 - **Paiement en ligne** : l'argent reste en séquestre. Il est versé dans le portefeuille de la boutique
   (moins 8 % de commission) quand le client confirme la réception, ou automatiquement 3 jours après la livraison.
@@ -219,8 +228,8 @@ Toutes les routes sont préfixées par `/api/`. L'authentification se fait par J
 | Social | `conversations/` (+ `start/`, `messages/`, `read/`, `typing/`) · `notifications/` · `auth/referral/` · `products/<slug>/reviews/` · `products/<slug>/share-image/` |
 | Promos et directs | `campaigns/` · `lives/` · `delivery/zones/` · `delivery/pickup-points/` · `config/` |
 | Portefeuille | `wallet/` · `wallet/payouts/` |
-| Vendeur | `vendor/shop/` · `vendor/products/` · `vendor/orders/` · `vendor/statuts/` · `vendor/coupons/` · `vendor/reviews/` · `vendor/lives/` · `vendor/stats/` · `vendor/verification/` |
-| Livreur | `auth/register/rider/` · `rider/profile/` · `rider/deliveries/` (+ `available/`, `accept/`, `pickup/`, `deliver/`, `location/`) |
+| Vendeur | `vendor/shop/` · `vendor/products/` · `vendor/orders/` (+ `counts/`, `<id>/status/`, `<id>/riders/`, `<id>/assign/`, `<id>/withdraw/`) · `vendor/statuts/` · `vendor/coupons/` · `vendor/reviews/` · `vendor/lives/` · `vendor/stats/` · `vendor/verification/` |
+| Livreur | `auth/register/rider/` · `rider/profile/` · `rider/deliveries/` (+ `accept/`, `decline/`, `pickup/`, `deliver/`, `release/`, `location/`) · `delivery/<id>/messages/` |
 | Temps réel | `ws/?token=<jwt>` (messages, notifications, position du livreur) · `ws/live/<id>/` (commentaires d'un direct) |
 
 L'espace vendeur n'est accessible qu'une fois la boutique approuvée par un admin.

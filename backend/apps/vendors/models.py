@@ -23,6 +23,16 @@ class Vendor(TimeStampedModel, SoftDeleteModel):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     whatsapp = PhoneField("numéro WhatsApp", blank=True)
 
+    # Adresse de retrait : où le livreur vient chercher les colis
+    pickup_city = models.CharField("ville de retrait", max_length=100, blank=True)
+    pickup_commune = models.CharField("commune de retrait", max_length=100, blank=True)
+    pickup_quartier = models.CharField("quartier de retrait", max_length=100, blank=True)
+    pickup_landmark = models.TextField("repère pour le livreur", blank=True)
+    pickup_phone = PhoneField("téléphone de retrait", blank=True, help_text="Vide = numéro WhatsApp de la boutique")
+    pickup_hours = models.CharField("horaires de retrait", max_length=100, blank=True)
+    pickup_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    pickup_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
     # Badge « Vendeur vérifié » : pièce d'identité + téléphone contrôlés par un admin
     is_verified = models.BooleanField("vérifié", default=False)
     verified_at = models.DateTimeField(null=True, blank=True)
@@ -49,6 +59,14 @@ class Vendor(TimeStampedModel, SoftDeleteModel):
     @property
     def is_approved(self):
         return self.status == self.Status.APPROVED
+
+    @property
+    def has_pickup_address(self):
+        return bool(self.pickup_city and self.pickup_commune and self.pickup_quartier and self.pickup_landmark.strip())
+
+    @property
+    def contact_phone(self):
+        return self.pickup_phone or self.whatsapp or self.user.phone
 
     @property
     def effective_commission_rate(self):

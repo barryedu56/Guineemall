@@ -81,7 +81,7 @@ class ConfigTests(GuineeMallTestCase):
         config = self.client.get("/api/config/").data
         self.assertNotIn("card", [m["value"] for m in config["payment_methods"]])
         self.assertEqual(config["delivery_locations"], [{"city": "Conakry", "communes": ["Ratoma"]}])
-        self.assertEqual(config["choices"]["vendor_order_status"][1]["action"], "Confirmer")
+        self.assertEqual(config["choices"]["vendor_order_status"][2]["action"], "Accepter la commande")
 
         vendor = self.make_vendor()
         product = self.make_product(vendor)

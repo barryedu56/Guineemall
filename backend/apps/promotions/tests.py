@@ -92,7 +92,7 @@ class ReferralTests(OrderTestCase):
         self.client.post("/api/orders/", {"address": address.pk, "payment_method": "cash_on_delivery"})
         vo = VendorOrder.objects.get(order__user=filleul)
         self.client.force_authenticate(self.madina.user)
-        for s in ["confirmed", "preparing", "ready", "delivered"]:
+        for s in ["preparing", "ready", "delivered"]:
             with self.captureOnCommitCallbacks(execute=True):
                 self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": s, **({"code": VendorOrder.objects.get(pk=vo.pk).delivery_code} if s == "delivered" else {})})
         self.assertEqual(parrain.personal_coupons.count(), 1)

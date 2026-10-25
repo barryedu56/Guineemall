@@ -16,13 +16,35 @@ class VendorSerializer(serializers.ModelSerializer):
         ]
 
 
+PICKUP_FIELDS = [
+    "pickup_city", "pickup_commune", "pickup_quartier", "pickup_landmark", "pickup_phone", "pickup_hours",
+    "pickup_latitude", "pickup_longitude",
+]
+
+
 class MyShopSerializer(serializers.ModelSerializer):
     """Le vendeur modifie sa propre boutique (il ne peut pas changer son statut ni son badge)."""
 
+    has_pickup_address = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = Vendor
-        fields = ["id", "slug", "shop_name", "description", "logo", "whatsapp", "status", "is_verified"]
+        fields = [
+            "id", "slug", "shop_name", "description", "logo", "whatsapp", "status", "is_verified",
+            *PICKUP_FIELDS, "has_pickup_address",
+        ]
         read_only_fields = ["id", "slug", "status", "is_verified"]
+
+    def validate(self, attrs):
+        city = attrs.get("pickup_city")
+        commune = attrs.get("pickup_commune")
+        if city and commune:
+            from apps.delivery.models import DeliveryZone
+
+            if not DeliveryZone.objects.filter(is_active=True, city__iexact=city, commune__iexact=commune).exists() \
+                    and not DeliveryZone.objects.filter(is_active=True, city__iexact=city, commune="").exists():
+                raise serializers.ValidationError({"pickup_commune": "Cette commune n'est pas encore desservie par nos livreurs."})
+        return attrs
 
 
 class VerificationRequestSerializer(serializers.ModelSerializer):

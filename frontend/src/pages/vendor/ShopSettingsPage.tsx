@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, ExternalLink } from 'lucide-react'
+import { BadgeCheck, ExternalLink, LocateFixed, MapPin } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -16,6 +16,7 @@ export default function ShopSettingsPage() {
   return (
     <div className="grid max-w-5xl gap-6 lg:grid-cols-2">
       <ShopSettingsForm shop={shop} />
+      <PickupAddressForm shop={shop} />
       {!shop.is_verified && <VerificationForm />}
     </div>
   )
@@ -157,6 +158,98 @@ function ShopSettingsForm({ shop }: { shop: MyShop }) {
           </Link>
         )}
       </div>
+    </form>
+  )
+}
+
+/** Où le livreur vient chercher les colis : indispensable pour demander un livreur. */
+function PickupAddressForm({ shop }: { shop: MyShop }) {
+  const queryClient = useQueryClient()
+  const { data: config } = useSiteConfig()
+  const locations = config?.delivery_locations ?? []
+  const [form, setForm] = useState({
+    pickup_city: shop.pickup_city,
+    pickup_commune: shop.pickup_commune,
+    pickup_quartier: shop.pickup_quartier,
+    pickup_landmark: shop.pickup_landmark,
+    pickup_phone: shop.pickup_phone,
+    pickup_hours: shop.pickup_hours,
+    pickup_latitude: shop.pickup_latitude,
+    pickup_longitude: shop.pickup_longitude,
+  })
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [locating, setLocating] = useState(false)
+  const city = form.pickup_city || locations[0]?.city || ''
+  const communes = locations.find((l) => l.city === city)?.communes ?? []
+  const commune = form.pickup_commune || communes[0] || ''
+  const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
+
+  const save = useMutation({
+    mutationFn: async () =>
+      (await api.patch<MyShop>('/vendor/shop/', { ...form, pickup_city: city, pickup_commune: commune })).data,
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['my-shop'], updated)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    },
+    onError: (e) => setError(errorMessage(e)),
+  })
+
+  function locate() {
+    if (!navigator.geolocation) return setError('Votre appareil ne donne pas sa position.')
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false)
+        setForm((f) => ({ ...f, pickup_latitude: pos.coords.latitude.toFixed(6), pickup_longitude: pos.coords.longitude.toFixed(6) }))
+      },
+      () => {
+        setLocating(false)
+        setError('Position refusée. Autorisez la localisation dans votre navigateur.')
+      },
+      { enableHighAccuracy: true },
+    )
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        setError(null)
+        save.mutate()
+      }}
+      className="h-fit space-y-4 card p-6"
+    >
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><MapPin className="size-5 text-primary-dark" /> Adresse de retrait des colis</h2>
+        <p className="text-sm text-ink/70">Le livreur que vous choisissez la voit pour venir chercher le colis. Elle n'est pas affichée aux clients.</p>
+      </div>
+      {!shop.has_pickup_address && (
+        <p className="rounded-xl bg-amber-100 p-3 text-sm font-medium text-amber-900">À remplir pour pouvoir confier vos colis à un livreur.</p>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select label="Ville" value={city} onChange={(e) => setForm({ ...form, pickup_city: e.target.value, pickup_commune: '' })}>
+          {locations.map((l) => <option key={l.city}>{l.city}</option>)}
+        </Select>
+        <Select label="Commune" value={commune} onChange={set('pickup_commune')}>
+          {communes.map((c) => <option key={c}>{c}</option>)}
+        </Select>
+      </div>
+      <Input label="Quartier" value={form.pickup_quartier} onChange={set('pickup_quartier')} required placeholder="Kipé" />
+      <Textarea label="Repère précis" value={form.pickup_landmark} onChange={set('pickup_landmark')} required placeholder="Immeuble bleu face à la pharmacie, 1er étage" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <PhoneInput label="Téléphone pour le livreur" value={form.pickup_phone} onValueChange={(pickup_phone) => setForm({ ...form, pickup_phone })} hint="Vide = votre numéro WhatsApp" />
+        <Input label="Horaires de retrait" value={form.pickup_hours} onChange={set('pickup_hours')} placeholder="Lun-Sam, 9 h - 19 h" />
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Button type="button" variant="outline" size="sm" loading={locating} onClick={locate}>
+          <LocateFixed className="size-4" /> {form.pickup_latitude ? 'Mettre à jour ma position' : 'Je suis à la boutique : enregistrer ma position'}
+        </Button>
+        {form.pickup_latitude && <span className="text-green-700">Position GPS enregistrée : le livreur aura l'itinéraire.</span>}
+      </div>
+      <ErrorBox message={error} />
+      <Button type="submit" loading={save.isPending}>{saved ? 'Enregistré ✓' : 'Enregistrer l’adresse'}</Button>
     </form>
   )
 }

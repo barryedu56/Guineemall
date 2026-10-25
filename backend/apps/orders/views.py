@@ -12,6 +12,7 @@ from apps.payments.services import start_payment
 from . import services
 from .models import CartItem, Order, OrderItem, VendorOrder
 from .serializers import (
+    AssignRiderSerializer,
     CartItemSerializer,
     CheckoutSerializer,
     OrderSerializer,
@@ -154,14 +155,32 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
         return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
 
 
+# Onglets de l'espace vendeur : ce qu'il reste à faire, étape par étape
+VENDOR_STEPS = {
+    "a-traiter": [VendorOrder.Status.PENDING, VendorOrder.Status.CONFIRMED],
+    "preparation": [VendorOrder.Status.PREPARING],
+    "livraison": [VendorOrder.Status.READY],
+    "terminees": [VendorOrder.Status.DELIVERED, VendorOrder.Status.CANCELLED],
+}
+
+
 class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
-    """Espace vendeur : les parties de commandes qui concernent sa boutique."""
+    """
+    Espace vendeur : les parties de commandes qui concernent sa boutique.
+    GET /vendor/orders/?etape=a-traiter|preparation|livraison|terminees · GET /vendor/orders/counts/
+    POST /vendor/orders/<id>/status/ · GET <id>/riders/ · POST <id>/assign/ {rider} · POST <id>/withdraw/
+    """
 
     serializer_class = VendorSideOrderSerializer
     permission_classes = [IsVendeur]
     filterset_fields = ["status"]
 
     def get_queryset(self):
+        queryset = self.visible_orders()
+        step = VENDOR_STEPS.get(self.request.query_params.get("etape", ""))
+        return queryset.filter(status__in=step) if step and self.action == "list" else queryset
+
+    def visible_orders(self):
         # Une commande payable en ligne n'apparaît qu'une fois payée
         return (
             get_vendor(self.request).vendor_orders
@@ -171,9 +190,60 @@ class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, views
                     Order.PaymentStatus.PAID, Order.PaymentStatus.REFUND_PENDING, Order.PaymentStatus.REFUNDED,
                 ])
             )
-            .select_related("order__user", "delivery__rider__user")
+            .select_related("order__user", "order__pickup_point", "vendor", "delivery__rider__user")
             .prefetch_related(Prefetch("items", queryset=OrderItem.objects.select_related("product")))
         )
+
+    @action(detail=False)
+    def counts(self, request):
+        """Nombre de commandes par onglet, et colis prêts qui attendent qu'on choisisse un livreur."""
+        orders = self.visible_orders()
+        data = {step: orders.filter(status__in=statuses).count() for step, statuses in VENDOR_STEPS.items() if step != "terminees"}
+        data["sans_livreur"] = orders.filter(status=VendorOrder.Status.READY, delivery__status="open").count()
+        return Response(data)
+
+    def get_delivery(self):
+        vendor_order = self.get_object()
+        delivery = getattr(vendor_order, "delivery", None)
+        if delivery is None or vendor_order.status != VendorOrder.Status.READY:
+            raise ValidationError({"detail": "Le colis doit d'abord être prêt."})
+        return vendor_order, delivery
+
+    @action(detail=True)
+    def riders(self, request, pk=None):
+        from apps.delivery.serializers import CandidateRiderSerializer
+        from apps.delivery.services import candidate_riders
+
+        _, delivery = self.get_delivery()
+        return Response(CandidateRiderSerializer(candidate_riders(delivery), many=True).data)
+
+    @action(detail=True, methods=["post"])
+    def assign(self, request, pk=None):
+        from apps.delivery.models import Rider
+        from apps.delivery.services import offer
+
+        payload = AssignRiderSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        _, delivery = self.get_delivery()
+        rider = Rider.objects.filter(pk=payload.validated_data["rider"]).select_related("user").first()
+        if rider is None:
+            raise ValidationError({"rider": "Livreur introuvable."})
+        try:
+            offer(delivery, rider, request.user)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
+
+    @action(detail=True, methods=["post"])
+    def withdraw(self, request, pk=None):
+        from apps.delivery.services import withdraw
+
+        _, delivery = self.get_delivery()
+        try:
+            withdraw(delivery, request.user)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
 
     @action(detail=True, methods=["post"])
     def status(self, request, pk=None):

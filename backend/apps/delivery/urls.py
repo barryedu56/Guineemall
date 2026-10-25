@@ -12,5 +12,6 @@ urlpatterns = [
     path("auth/register/rider/", views.RiderRegisterView.as_view(), name="register-rider"),
     path("rider/profile/", views.RiderProfileView.as_view(), name="rider-profile"),
     path("delivery/<int:pk>/rate/", views.rate_delivery, name="rate-delivery"),
+    path("delivery/<int:pk>/messages/", views.DeliveryChatView.as_view(), name="delivery-messages"),
     *router.urls,
 ]

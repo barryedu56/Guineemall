@@ -198,6 +198,7 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULE = {
     "annuler-commandes-non-payees": {"task": "apps.payments.tasks.expire_unpaid_orders", "schedule": 300},
     "liberer-paiements-sequestre": {"task": "apps.wallet.tasks.release_escrow", "schedule": 3600},
+    "expirer-propositions-livreur": {"task": "apps.delivery.tasks.expire_offers", "schedule": 60},
     "supprimer-medias-statuts-expires": {"task": "apps.statuts.tasks.purge_expired_statuts", "schedule": 86400},
 }
 
@@ -214,6 +215,8 @@ REFERRAL_REWARD_GNF = 10_000
 # Un livreur qui doit plus que ce montant (espèces encaissées non reversées) ne prend plus de course en espèces
 RIDER_CASH_LIMIT = env.int("RIDER_CASH_LIMIT", default=2_000_000)
 DELIVERY_CODE_MAX_ATTEMPTS = 5
+# Temps laissé au livreur pour accepter une course proposée par une boutique
+DELIVERY_OFFER_MINUTES = 10
 
 # Paiements : "simulation" en développement, "live" avec les vraies clés
 PAYMENT_MODE = env("PAYMENT_MODE", default="simulation")

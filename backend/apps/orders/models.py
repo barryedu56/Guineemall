@@ -133,6 +133,9 @@ class VendorOrder(TimeStampedModel):
         "codes faux saisis", default=0, help_text="Remettre à 0 pour débloquer après vérification"
     )
 
+    accepted_at = models.DateTimeField("acceptée le", null=True, blank=True)
+    ready_at = models.DateTimeField("colis prêt le", null=True, blank=True)
+
     # Séquestre : l'argent est versé au vendeur après confirmation de réception
     delivered_at = models.DateTimeField(null=True, blank=True)
     received_at = models.DateTimeField("réception confirmée le", null=True, blank=True)

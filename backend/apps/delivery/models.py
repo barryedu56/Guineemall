@@ -72,15 +72,24 @@ class Rider(TimeStampedModel):
     class Meta:
         verbose_name = "livreur"
 
+    @property
+    def communes_list(self):
+        return [c.strip() for c in self.communes.split(",") if c.strip()]
+
     def __str__(self):
         return self.user.name
 
 
 class Delivery(TimeStampedModel):
-    """Course de livraison d'une sous-commande (une boutique → un client)."""
+    """
+    Course de livraison d'une sous-commande (une boutique → un client).
+    La boutique choisit le livreur : la course lui est proposée, il accepte ou refuse.
+    Aucun livreur ne voit une course qui ne lui a pas été proposée.
+    """
 
     class Status(models.TextChoices):
-        OPEN = "open", "En attente d'un livreur"
+        OPEN = "open", "Livreur à choisir"
+        OFFERED = "offered", "Proposée au livreur"
         ASSIGNED = "assigned", "Livreur en route vers la boutique"
         PICKED_UP = "picked_up", "Colis récupéré, en route"
         DELIVERED = "delivered", "Livré"
@@ -90,6 +99,9 @@ class Delivery(TimeStampedModel):
     rider = models.ForeignKey(Rider, on_delete=models.SET_NULL, null=True, blank=True, related_name="deliveries")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     fee = models.PositiveIntegerField("rémunération livreur (GNF)", default=0)
+    offered_at = models.DateTimeField("proposée le", null=True, blank=True)
+    accepted_at = models.DateTimeField("acceptée le", null=True, blank=True)
+    declined_by = models.ManyToManyField(Rider, blank=True, related_name="declined_deliveries", verbose_name="refusée par")
     picked_up_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
 
@@ -98,6 +110,23 @@ class Delivery(TimeStampedModel):
         verbose_name_plural = "livraisons"
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["status"])]
+
+
+class DeliveryMessage(models.Model):
+    """Discussion boutique ↔ livreur à propos d'une course (un fil par livreur)."""
+
+    delivery = models.ForeignKey(Delivery, on_delete=models.CASCADE, related_name="messages")
+    rider = models.ForeignKey(Rider, on_delete=models.CASCADE, related_name="+")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    content = models.TextField(blank=True)
+    image = models.ImageField(upload_to="delivery_chat/", blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "message de course"
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["delivery", "rider", "created_at"])]
 
 
 class DeliveryRating(models.Model):

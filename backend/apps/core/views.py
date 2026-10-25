@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from apps.accounts.models import User
 from apps.catalog.views import public_products
-from apps.delivery.models import DeliveryZone, PickupPoint
+from apps.delivery.models import Delivery, DeliveryZone, PickupPoint
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Coupon
 from apps.vendors.models import Vendor, VerificationRequest
@@ -16,12 +16,19 @@ from .models import SiteSettings
 
 # Texte des boutons d'action du vendeur pour chaque statut cible
 VENDOR_ACTION_LABELS = {
-    "confirmed": "Confirmer",
-    "preparing": "Commencer la préparation",
-    "ready": "Marquer prête",
-    "delivered": "Marquer livrée",
+    "preparing": "Accepter la commande",
+    "ready": "Le colis est prêt",
+    "delivered": "Remis au client",
     "cancelled": "Refuser / annuler",
 }
+
+# Onglets de l'espace vendeur (voir apps.orders.views.VENDOR_STEPS)
+VENDOR_ORDER_STEPS = [
+    {"value": "a-traiter", "label": "À traiter"},
+    {"value": "preparation", "label": "En préparation"},
+    {"value": "livraison", "label": "En livraison"},
+    {"value": "terminees", "label": "Terminées"},
+]
 
 PAYMENT_DESCRIPTIONS = {
     "orange_money": "Payez depuis votre téléphone, argent protégé",
@@ -89,6 +96,8 @@ def site_config(request):
             "vendor_order_status": [
                 {**c, "action": VENDOR_ACTION_LABELS.get(c["value"], "")} for c in choices(VendorOrder.Status)
             ],
+            "vendor_order_step": VENDOR_ORDER_STEPS,
+            "delivery_status": choices(Delivery.Status),
             "document_type": choices(VerificationRequest.DocumentType),
             "payout_method": choices(PayoutRequest.Method),
             "deposit_method": choices(CashDeposit.Method),
@@ -114,5 +123,6 @@ def site_config(request):
         "escrow_days": settings.ESCROW_AUTO_RELEASE_DAYS,
         "unpaid_timeout_minutes": settings.UNPAID_ORDER_TIMEOUT_MINUTES,
         "rider_cash_limit": settings.RIDER_CASH_LIMIT,
+        "delivery_offer_minutes": settings.DELIVERY_OFFER_MINUTES,
         "page_size": 20,
     })

@@ -32,6 +32,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       socket.onmessage = (msg) => {
         const event = JSON.parse(msg.data) as RealtimeEvent
         if (event.type === 'notification') queryClient.invalidateQueries({ queryKey: ['notifications'] })
+        if (event.type === 'delivery.updated' || event.type === 'delivery.message') {
+          // Course modifiée (livreur choisi, accepté, colis récupéré…) ou nouveau message : écrans à jour
+          queryClient.invalidateQueries({ queryKey: ['vendor-orders'] })
+          queryClient.invalidateQueries({ queryKey: ['rider-deliveries'] })
+          if (event.type === 'delivery.message') queryClient.invalidateQueries({ queryKey: ['delivery-chat', event.delivery] })
+        }
         if (event.type === 'chat.message' || event.type === 'chat.read') {
           queryClient.invalidateQueries({ queryKey: ['conversations'] })
         }

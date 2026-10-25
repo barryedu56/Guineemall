@@ -74,6 +74,18 @@ export function formatPhone(phone: string | null | undefined) {
   return d.length === 9 ? `${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5, 7)} ${d.slice(7)}` : (phone ?? '')
 }
 
+/** Lien WhatsApp vers un numéro guinéen (null si le numéro est incomplet). */
+export function whatsappUrl(phone: string | null | undefined, text = '') {
+  const d = (phone ?? '').replace(/\D/g, '').replace(/^224/, '')
+  if (d.length !== 9) return null
+  return `https://wa.me/224${d}${text ? `?text=${encodeURIComponent(text)}` : ''}`
+}
+
+/** Itinéraire Google Maps vers une position (null sans coordonnées). */
+export function directionsUrl(latitude: string | null | undefined, longitude: string | null | undefined) {
+  return latitude && longitude ? `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}` : null
+}
+
 /** Extrait un message lisible d'une erreur de l'API Django REST Framework. */
 export function errorMessage(error: unknown): string {
   if (error instanceof AxiosError) {
@@ -95,6 +107,10 @@ export function errorMessage(error: unknown): string {
 
 export function formatDate(iso: string) {
   return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+}
+
+export function formatTime(iso: string) {
+  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
 }
 
 export function timeAgo(iso: string) {

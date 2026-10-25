@@ -7,6 +7,8 @@ export type RealtimeEvent =
   | { type: 'chat.typing'; conversation: number }
   | { type: 'chat.read'; conversation: number }
   | { type: 'rider_location'; order_id: number; latitude: string; longitude: string }
+  | { type: 'delivery.updated'; delivery: number; vendor_order?: number }
+  | { type: 'delivery.message'; delivery: number; vendor_order: number }
 
 type Listener = (event: RealtimeEvent) => void
 

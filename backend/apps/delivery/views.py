@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.db.models import Q
-from rest_framework import generics, mixins, permissions, serializers, status, viewsets
+from rest_framework import generics, mixins, parsers, permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import BasePermission
@@ -13,7 +13,13 @@ from apps.orders.services import OrderError
 
 from . import services
 from .models import Delivery, DeliveryZone, PickupPoint, Rider
-from .serializers import DeliveryZoneSerializer, PickupPointSerializer, RiderDeliverySerializer, RiderSerializer
+from .serializers import (
+    DeliveryMessageSerializer,
+    DeliveryZoneSerializer,
+    PickupPointSerializer,
+    RiderDeliverySerializer,
+    RiderSerializer,
+)
 
 
 class DeliveryZoneViewSet(viewsets.ReadOnlyModelViewSet):
@@ -97,55 +103,43 @@ class LocationSerializer(serializers.Serializer):
 
 class RiderDeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """
-    GET /rider/deliveries/ : mes courses · GET /rider/deliveries/available/ : courses libres dans ma ville
-    POST /rider/deliveries/<id>/accept|pickup|deliver/ · POST /rider/deliveries/location/
+    Courses proposées au livreur par les boutiques, ou qu'il a acceptées.
+    GET /rider/deliveries/?etat=propositions|en-cours|terminees
+    POST /rider/deliveries/<id>/accept|decline|pickup|deliver|release/ · POST /rider/deliveries/location/
     """
 
     serializer_class = RiderDeliverySerializer
     permission_classes = [IsApprovedRider]
 
-    def base_queryset(self):
-        return Delivery.objects.select_related(
-            "vendor_order__order__user", "vendor_order__vendor__user"
-        ).prefetch_related("vendor_order__items")
+    STATES = {
+        "propositions": [Delivery.Status.OFFERED],
+        "en-cours": [Delivery.Status.ASSIGNED, Delivery.Status.PICKED_UP],
+        "terminees": [Delivery.Status.DELIVERED],
+    }
 
     def get_queryset(self):
-        rider = self.request.user.rider
-        if self.action in ("available", "accept"):
-            if not rider.is_available:
-                return Delivery.objects.none()
-            queryset = self.base_queryset().filter(
-                status=Delivery.Status.OPEN, vendor_order__order__delivery_city__iexact=rider.city
-            )
-            communes = [c.strip() for c in rider.communes.split(",") if c.strip()]
-            if communes:
-                # Courses des communes desservies (et celles sans commune précise)
-                match = Q(vendor_order__order__delivery_commune="")
-                for commune in communes:
-                    match |= Q(vendor_order__order__delivery_commune__iexact=commune)
-                queryset = queryset.filter(match)
-            return queryset
-        return self.base_queryset().filter(rider=rider)
-
-    @action(detail=False)
-    def available(self, request):
-        rider = request.user.rider
-        data = self.get_serializer(self.get_queryset(), many=True).data
-        # Course en espèces impossible si elle ferait dépasser le plafond d'espèces non reversées
-        for item in data:
-            item["cash_blocked"] = not services.can_carry_cash(rider, item["cash_to_collect"])
-        return Response(data)
+        queryset = Delivery.objects.filter(rider=self.request.user.rider).select_related(
+            "vendor_order__order__user", "vendor_order__vendor__user", "rider__user"
+        ).prefetch_related("vendor_order__items")
+        states = self.STATES.get(self.request.query_params.get("etat", ""))
+        return queryset.filter(status__in=states) if states else queryset
 
     def _run(self, fn):
         try:
             delivery = fn(self.get_object(), self.request.user.rider)
         except OrderError as e:
             raise ValidationError({"detail": str(e)})
-        return Response(self.get_serializer(self.base_queryset().get(pk=delivery.pk)).data)
+        if delivery.rider_id != self.request.user.rider.pk:
+            return Response(status=status.HTTP_204_NO_CONTENT)  # course refusée ou rendue : plus la sienne
+        return Response(self.get_serializer(self.get_queryset().get(pk=delivery.pk)).data)
 
     @action(detail=True, methods=["post"])
     def accept(self, request, pk=None):
         return self._run(services.accept)
+
+    @action(detail=True, methods=["post"])
+    def decline(self, request, pk=None):
+        return self._run(services.decline)
 
     @action(detail=True, methods=["post"])
     def pickup(self, request, pk=None):
@@ -166,3 +160,46 @@ class RiderDeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
         payload.is_valid(raise_exception=True)
         services.update_location(request.user.rider, **payload.validated_data)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DeliveryChatView(generics.GenericAPIView):
+    """
+    Discussion entre la boutique et le livreur de la course.
+    GET /delivery/<id>/messages/ (marque comme lus) · POST {content | image}
+    """
+
+    serializer_class = DeliveryMessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+    throttle_scope = "messages"
+
+    def get_throttles(self):
+        # Limite seulement à l'envoi, pas à la lecture
+        return super().get_throttles() if self.request.method == "POST" else []
+
+    def get_delivery(self):
+        user = self.request.user
+        delivery = generics.get_object_or_404(
+            Delivery.objects.select_related("rider__user", "vendor_order__vendor__user"),
+            Q(vendor_order__vendor__user=user) | Q(rider__user=user),
+            pk=self.kwargs["pk"],
+        )
+        if delivery.rider_id is None:
+            raise ValidationError({"detail": "Aucun livreur sur cette course pour le moment."})
+        return delivery
+
+    def get(self, request, pk):
+        delivery = self.get_delivery()
+        services.mark_messages_read(delivery, request.user)
+        messages = delivery.messages.filter(rider=delivery.rider).select_related("sender")
+        return Response(self.get_serializer(messages, many=True).data)
+
+    def post(self, request, pk):
+        delivery = self.get_delivery()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            message = services.send_message(delivery, request.user, serializer)
+        except OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(message).data, status=status.HTTP_201_CREATED)
