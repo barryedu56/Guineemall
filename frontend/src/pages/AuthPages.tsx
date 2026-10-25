@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
-import { CheckCircle2, KeyRound, ShieldCheck, Smartphone, Store, Truck } from 'lucide-react'
+import { CheckCircle2, KeyRound, ShieldCheck, ShoppingBag, Smartphone, Store, Truck } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 
 import { Logo } from '../components/Layout'
 import { Button, ErrorBox, Input, PhoneInput, Textarea } from '../components/ui'
@@ -42,6 +42,36 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
         </div>
       </div>
     </div>
+  )
+}
+
+const ACCOUNT_TYPES = [
+  { to: '/inscription', icon: ShoppingBag, label: 'Acheter', text: 'Commander et se faire livrer' },
+  { to: '/devenir-vendeur', icon: Store, label: 'Vendre', text: 'Ouvrir sa boutique (validée par l\'équipe)' },
+  { to: '/devenir-livreur', icon: Truck, label: 'Livrer', text: 'Livrer à moto (validé par l\'équipe)' },
+]
+
+/** Choix du type de compte, en haut des trois pages d'inscription. */
+export function AccountTypeSwitch() {
+  const { pathname } = useLocation()
+  return (
+    <nav className="mb-8 grid grid-cols-3 gap-2" aria-label="Type de compte">
+      {ACCOUNT_TYPES.map(({ to, icon: Icon, label, text }) => {
+        const active = pathname === to
+        return (
+          <Link
+            key={to}
+            to={to}
+            aria-current={active ? 'page' : undefined}
+            className={`flex flex-col items-center gap-1 rounded-2xl p-3 text-center transition ring-1 ${active ? 'bg-ink text-white ring-ink' : 'ring-ink/10 hover:ring-ink/30'}`}
+          >
+            <Icon className={`size-6 ${active ? 'text-primary' : 'text-primary-dark'}`} />
+            <span className="text-sm font-bold">{label}</span>
+            <span className={`hidden text-[11px] leading-tight sm:block ${active ? 'text-white/70' : 'text-ink/50'}`}>{text}</span>
+          </Link>
+        )
+      })}
+    </nav>
   )
 }
 
@@ -154,7 +184,8 @@ export function RegisterPage() {
   })
 
   return (
-    <AuthLayout title="Créer un compte" subtitle="Quelques secondes suffisent.">
+    <AuthLayout title="Créer un compte" subtitle="Choisissez ce que vous voulez faire sur la plateforme.">
+      <AccountTypeSwitch />
       <form onSubmit={submit} className="space-y-4">
         <Input label="Nom complet" value={form.name} onChange={set('name')} required autoComplete="name" />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -174,9 +205,6 @@ export function RegisterPage() {
       <p className="mt-8 text-center text-sm text-ink/60">
         Déjà inscrit ? <Link to="/connexion" className="font-bold text-ink hover:underline">Se connecter</Link>
       </p>
-      <Link to="/devenir-vendeur" className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-primary-dark hover:underline">
-        <Store className="size-4" /> Vous voulez vendre ? Ouvrez votre boutique
-      </Link>
     </AuthLayout>
   )
 }
@@ -196,6 +224,7 @@ export function VendorRegisterPage() {
       title="Ouvrir ma boutique"
       subtitle={`Vendez dans toute la Guinée. Votre boutique est visible dès sa validation par l'équipe ${config?.site.name ?? ''}.`}
     >
+      <AccountTypeSwitch />
       <form onSubmit={submit} className="space-y-4">
         <p className="text-xs font-bold uppercase tracking-wider text-ink/45">Votre boutique</p>
         <Input label="Nom de la boutique" value={form.shop_name} onChange={set('shop_name')} required />

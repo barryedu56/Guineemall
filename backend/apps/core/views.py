@@ -75,7 +75,11 @@ def site_config(request):
             {"value": m, "label": payment_labels[m], "description": PAYMENT_DESCRIPTIONS[m]}
             for m in site.enabled_payment_methods()
         ],
-        "delivery_locations": [{"city": city, "communes": communes} for city, communes in locations.items()],
+        # Villes les plus desservies d'abord (proposées par défaut dans les formulaires)
+        "delivery_locations": [
+            {"city": city, "communes": communes}
+            for city, communes in sorted(locations.items(), key=lambda item: (-len(item[1]), item[0]))
+        ],
         "pickup_points": PickupPoint.objects.filter(is_active=True).count(),
         "products_on_sale": public_products().filter(compare_at_price__gt=F("price")).count(),
         "choices": {

@@ -4,27 +4,33 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import Price from '../components/Price'
-import { Button, Empty, ErrorBox, Input, PhoneInput, Spinner, StatusBadge } from '../components/ui'
+import { Button, Empty, ErrorBox, Input, PhoneInput, Select, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useRealtime } from '../context/realtime'
 import { useSiteConfig } from '../context/settings'
 import { api, errorMessage, formatPhone } from '../lib/api'
 import type { RiderDelivery, RiderProfile } from '../lib/types'
+import { AccountTypeSwitch, AuthLayout } from './AuthPages'
 
 export function RiderRegisterPage() {
   const { registerRider } = useAuth()
   const { data: config } = useSiteConfig()
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', city: 'Conakry', communes: '', vehicle_plate: '' })
+  const locations = config?.delivery_locations ?? []
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', city: '', vehicle_plate: '' })
+  const [communes, setCommunes] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
+  // Villes et communes proposées = celles où la livraison est réellement assurée
+  const city = form.city || locations[0]?.city || ''
+  const cityCommunes = locations.find((l) => l.city === city)?.communes ?? []
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      await registerRider(form) // <GuestOnly> redirige vers /livreur
+      await registerRider({ ...form, city, communes: communes.join(', ') }) // <GuestOnly> redirige vers /livreur
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -33,22 +39,52 @@ export function RiderRegisterPage() {
   }
 
   return (
-    <div className="card mx-auto max-w-md p-6 sm:p-10">
-      <Bike className="size-10 text-primary-dark" />
-      <h1 className="mt-2 text-2xl font-bold">Devenir livreur {config?.site.name}</h1>
-      <p className="mb-6 mt-1 text-ink/70">Livrez à moto dans votre quartier et soyez payé à chaque course.</p>
+    <AuthLayout title="Devenir livreur" subtitle={`Livrez à moto dans votre quartier et soyez payé à chaque course, directement dans votre portefeuille ${config?.site.name ?? ''}.`}>
+      <AccountTypeSwitch />
+      <ol className="mb-6 space-y-1 rounded-2xl bg-primary-light p-4 text-sm">
+        <li><strong>1.</strong> Vous envoyez votre candidature.</li>
+        <li><strong>2.</strong> L'équipe la vérifie et valide votre compte (vous êtes prévenu).</li>
+        <li><strong>3.</strong> Vous passez « Disponible » et acceptez les courses proposées.</li>
+      </ol>
       <form onSubmit={submit} className="space-y-4">
-        <Input label="Nom complet" value={form.name} onChange={set('name')} required />
-        <PhoneInput label="Téléphone" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
-        <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
-        <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required minLength={8} />
-        <Input label="Ville" value={form.city} onChange={set('city')} required />
-        <Input label="Communes desservies" value={form.communes} onChange={set('communes')} placeholder="Ratoma, Dixinn" />
-        <Input label="Plaque de la moto" value={form.vehicle_plate} onChange={set('vehicle_plate')} />
+        <Input label="Nom complet" value={form.name} onChange={set('name')} required autoComplete="name" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <PhoneInput label="Téléphone" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
+          <Input label="Email" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />
+        </div>
+        <Input label="Mot de passe" type="password" value={form.password} onChange={set('password')} required minLength={8} autoComplete="new-password" hint="8 caractères minimum" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select label="Ville" value={city} onChange={(e) => { setForm({ ...form, city: e.target.value }); setCommunes([]) }}>
+            {locations.map((l) => <option key={l.city}>{l.city}</option>)}
+          </Select>
+          <Input label="Plaque de la moto" value={form.vehicle_plate} onChange={set('vehicle_plate')} placeholder="RC-1234-A" />
+        </div>
+        {cityCommunes.length > 0 && (
+          <fieldset>
+            <legend className="text-sm font-semibold">Communes où vous livrez</legend>
+            <p className="mb-2 text-xs text-ink/55">Aucune cochée = toute la ville.</p>
+            <div className="flex flex-wrap gap-2">
+              {cityCommunes.map((c) => {
+                const on = communes.includes(c)
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setCommunes(on ? communes.filter((x) => x !== c) : [...communes, c])}
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 transition ${on ? 'bg-ink text-white ring-ink' : 'ring-ink/15 hover:ring-ink/30'}`}
+                  >
+                    {c}
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+        )}
         <ErrorBox message={error} />
-        <Button type="submit" loading={loading} className="w-full">Envoyer ma candidature</Button>
+        <Button type="submit" size="lg" loading={loading} className="w-full">Envoyer ma candidature</Button>
       </form>
-    </div>
+    </AuthLayout>
   )
 }
 
