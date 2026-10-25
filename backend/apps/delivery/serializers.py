@@ -79,6 +79,7 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     pickup = serializers.SerializerMethodField()
     dropoff = serializers.SerializerMethodField()
     cash_to_collect = serializers.SerializerMethodField()
+    cash_for_shop = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
     items_count = serializers.SerializerMethodField()
     offer_expires_at = serializers.SerializerMethodField()
@@ -88,7 +89,8 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
     class Meta:
         model = Delivery
         fields = [
-            "id", "order_id", "status", "status_label", "fee", "cash_to_collect", "items", "items_count",
+            "id", "order_id", "status", "status_label", "fee", "cash_to_collect", "cash_for_shop", "cash_handed_at",
+            "items", "items_count",
             "pickup", "dropoff", "offer_expires_at", "timeline", "unread", "offered_at", "accepted_at",
             "picked_up_at", "delivered_at", "created_at",
         ]
@@ -115,6 +117,11 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         from .services import cash_to_collect
 
         return cash_to_collect(delivery)
+
+    def get_cash_for_shop(self, delivery):
+        from .services import cash_for_shop
+
+        return cash_for_shop(delivery)
 
     def get_items(self, delivery):
         return [{"name": i.product_name, "quantity": i.quantity} for i in delivery.vendor_order.items.all()]
@@ -163,12 +170,14 @@ class CandidateRiderSerializer(serializers.ModelSerializer):
 
 def delivery_for_vendor(delivery, user):
     """Course vue par la boutique : le livreur choisi, où il en est, la discussion."""
-    from .services import offer_expires_at, rider_rating
+    from .services import cash_for_shop, offer_expires_at, rider_rating
 
     if delivery is None:
         return None
     rider = delivery.rider
     return {
+        "cash_for_shop": cash_for_shop(delivery),
+        "cash_handed_at": delivery.cash_handed_at,
         "id": delivery.id,
         "status": delivery.status,
         "status_label": delivery.get_status_display(),

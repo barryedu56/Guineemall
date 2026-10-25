@@ -180,6 +180,7 @@ class RiderFlowTests(OrderTestCase):
         self.assertEqual(self.as_rider("deliver", code=self.vo.delivery_code).status_code, 200)
         self.vo.refresh_from_db()
         self.assertEqual(self.vo.status, "delivered")
+        self.as_shop("cash-received")  # paiement à la livraison : la boutique a reçu l'argent du livreur
         steps = {s["key"]: s["done"] for s in self.as_shop("", method="get").data["timeline"]}
         self.assertTrue(all(steps.values()), steps)
 
@@ -215,7 +216,8 @@ class RiderFlowTests(OrderTestCase):
         self.assertEqual(self.as_rider("release").status_code, 400)  # colis en main : plus possible
 
     def test_plafond_d_especes(self):
-        LedgerEntry.objects.create(user=self.rider_user, kind="adjustment", amount=-1_900_000)
+        # Dette d'anciennes courses en espèces au-delà du plafond : plus de course en espèces
+        LedgerEntry.objects.create(user=self.rider_user, kind="adjustment", amount=-2_000_000)
         self.assertTrue(self.as_shop("riders", method="get").data[0]["cash_blocked"])
         r = self.as_shop("assign", rider=self.rider.pk)
         self.assertEqual(r.status_code, 400)

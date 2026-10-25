@@ -126,9 +126,9 @@ du statut directement auprès de l'opérateur.
 ### Comment circule l'argent
 - **Paiement en ligne** : l'argent reste en séquestre. Il est versé dans le portefeuille de la boutique
   (moins 8 % de commission) quand le client confirme la réception, ou automatiquement 3 jours après la livraison.
-- **Paiement à la livraison** : celui qui livre encaisse. Si c'est la boutique, la commission est débitée de
-  son portefeuille ; si c'est un livreur GuinéeMall, son portefeuille est débité des espèces encaissées et
-  crédité de sa course.
+- **Paiement à la livraison** : GuinéeMall reste en dehors, sans commission. Le livreur encaisse le client,
+  garde le prix de sa course et remet le reste à la boutique, qui confirme l'avoir reçu (ou la boutique
+  encaisse elle-même). Seule une réduction offerte par GuinéeMall est remboursée à la boutique dans son portefeuille.
 - **À qui paie le client ?** Toujours au compte marchand GuinéeMall (Orange Money, MTN ou carte), jamais à la
   boutique : la page de l'opérateur affiche « GuinéeMall » comme bénéficiaire. La référence de la commande
   accompagne le paiement, ce qui permet de la retrouver, puis de payer chaque boutique après la livraison.

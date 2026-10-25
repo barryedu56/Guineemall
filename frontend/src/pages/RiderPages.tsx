@@ -145,6 +145,7 @@ export function RiderDashboard() {
   const { data: offers = [] } = useRiderDeliveries('propositions', approved)
   const { data: active = [] } = useRiderDeliveries('en-cours', approved)
   const { data: done = [] } = useRiderDeliveries('terminees', approved)
+  const toHand = done.filter((d) => d.cash_for_shop > 0 && !d.cash_handed_at)
   const sharing = useShareLocation(active.some((d) => d.status === 'picked_up'))
   useDeliveryNews()
 
@@ -222,6 +223,19 @@ export function RiderDashboard() {
         </p>
       </section>
       <ErrorBox message={error} />
+
+      {toHand.length > 0 && (
+        <section className="space-y-2 rounded-2xl bg-amber-100 p-4 text-amber-950">
+          <h2 className="flex items-center gap-2 font-bold"><Banknote className="size-5" /> Argent à remettre aux boutiques</h2>
+          {toHand.map((d) => (
+            <Link key={d.id} to={`/livreur/courses/${d.id}`} className="flex items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm">
+              <span>#{d.order_id} · {d.pickup.shop_name}</span>
+              <Price amount={d.cash_for_shop} className="font-bold" />
+            </Link>
+          ))}
+          <p className="text-xs">La boutique confirme quand elle a reçu l'argent.</p>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="font-semibold">Propositions des boutiques</h2>
@@ -318,7 +332,10 @@ function Money({ d }: { d: RiderDelivery }) {
     <div className="flex flex-wrap items-center gap-4 rounded-xl bg-background p-3 text-sm">
       <span>Vous gagnez : <Price amount={d.fee} className="font-bold text-green-700" /></span>
       {d.cash_to_collect > 0 && (
-        <span className="flex items-center gap-1"><Banknote className="size-4" /> À encaisser : <Price amount={d.cash_to_collect} className="font-bold" /></span>
+        <>
+          <span className="flex items-center gap-1"><Banknote className="size-4" /> À encaisser chez le client : <Price amount={d.cash_to_collect} className="font-bold" /></span>
+          <span>À remettre à la boutique : <Price amount={d.cash_for_shop} className="font-bold" /></span>
+        </>
       )}
       <span className="text-ink/60">{d.items_count} article(s)</span>
     </div>
@@ -439,6 +456,22 @@ export function RiderDeliveryPage() {
         </section>
 
         <Money d={d} />
+        {d.status === 'delivered' && d.cash_for_shop > 0 && (
+          <section className={`flex flex-wrap items-center gap-3 rounded-2xl p-4 text-sm ${d.cash_handed_at ? 'bg-green-50 text-green-800' : 'bg-amber-100 text-amber-950'}`}>
+            <Banknote className="size-6 shrink-0" />
+            <p className="flex-1">
+              {d.cash_handed_at ? (
+                <>{d.pickup.shop_name} a confirmé avoir reçu <Price amount={d.cash_for_shop} className="font-bold" />. Merci !</>
+              ) : (
+                <>
+                  3. Remettez <Price amount={d.cash_for_shop} className="font-bold" /> à {d.pickup.shop_name} (vous gardez <Price amount={d.fee} />).
+                  La boutique confirmera la réception.
+                </>
+              )}
+            </p>
+            {!d.cash_handed_at && <ContactButtons phone={d.pickup.phone} whatsapp={d.pickup.whatsapp} latitude={d.pickup.latitude} longitude={d.pickup.longitude} />}
+          </section>
+        )}
 
         {d.status === 'offered' && (
           <div className="flex flex-wrap gap-2">

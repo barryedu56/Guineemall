@@ -249,8 +249,11 @@ export function VendorOrderDetailPage() {
           </Step>
         )}
 
-        {order.status === 'delivered' && (
-          <Step title="Commande livrée 🎉" text={order.funds_released_at ? 'Le paiement est dans votre portefeuille.' : order.payment_method === 'cash_on_delivery' ? 'Payée en espèces à la livraison.' : 'Vous serez payé dès que le client confirme la réception.'}>
+        {order.status === 'delivered' && order.payment_method === 'cash_on_delivery' && (
+          <CashHandover order={order} loading={busy('cash-received')} onConfirm={() => run.mutate({ path: 'cash-received' })} />
+        )}
+        {order.status === 'delivered' && order.payment_method !== 'cash_on_delivery' && (
+          <Step title="Commande livrée 🎉" text={order.funds_released_at ? 'Le paiement est dans votre portefeuille.' : 'Vous serez payé dès que le client confirme la réception.'}>
             <Link to="/vendeur/portefeuille" className="text-sm font-semibold text-primary-dark hover:underline">Voir mon portefeuille →</Link>
           </Step>
         )}
@@ -298,7 +301,8 @@ export function VendorOrderDetailPage() {
             </li>
             <li className="text-xs text-ink/60">{order.payment_method_label}</li>
             <li className="flex justify-between pt-2 text-ink/70">
-              <span>Vous touchez (après commission)</span><span className="font-bold text-ink">{formatGNF(order.net_amount)}</span>
+              <span>{order.payment_method === 'cash_on_delivery' ? 'Vous touchez (espèces, sans commission)' : 'Vous touchez (après commission)'}</span>
+              <span className="font-bold text-ink">{formatGNF(order.net_amount)}</span>
             </li>
           </ul>
           {order.payment_method !== 'cash_on_delivery' && !order.funds_released_at && order.status !== 'cancelled' && (
@@ -310,6 +314,32 @@ export function VendorOrderDetailPage() {
         <Button variant="ghost" onClick={() => navigate('/vendeur/commandes')}>← Toutes les commandes</Button>
       </aside>
     </div>
+  )
+}
+
+/** Paiement à la livraison : l'argent du client passe du livreur à la boutique, sans GuinéeMall. */
+function CashHandover({ order, loading, onConfirm }: { order: VendorSideOrder; loading: boolean; onConfirm: () => void }) {
+  const courier = order.courier
+  if (!courier?.rider || !courier.cash_for_shop) {
+    return <Step title="Commande livrée 🎉" text="Payée en espèces à la livraison : l'argent est à vous, sans commission." />
+  }
+  if (courier.cash_handed_at) {
+    return (
+      <Step title="Commande terminée 🎉" text={`Vous avez reçu ${formatGNF(courier.cash_for_shop)} de ${courier.rider.name} le ${formatDate(courier.cash_handed_at)}.`} />
+    )
+  }
+  return (
+    <Step
+      title={`${courier.rider.name} doit vous remettre ${formatGNF(courier.cash_for_shop)}`}
+      text={`Le client a payé ${formatGNF(order.total_amount)} en espèces. Le livreur garde sa course (${formatGNF(courier.fee)}) et vous remet le reste. Confirmez quand vous l'avez reçu.`}
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="lg" loading={loading} onClick={() => window.confirm(`Confirmer avoir reçu ${formatGNF(courier.cash_for_shop)} de ${courier.rider!.name} ?`) && onConfirm()}>
+          J'ai reçu l'argent
+        </Button>
+        <ContactButtons phone={courier.rider.phone} message={`Bonjour ${courier.rider.name}, c'est pour l'argent de la commande #${order.order_id}.`} />
+      </div>
+    </Step>
   )
 }
 
@@ -481,7 +511,8 @@ function RiderPicker({ order, loading, onPick }: { order: VendorSideOrder; loadi
     <div className="space-y-2">
       {order.cash_to_collect > 0 && (
         <p className="flex items-center gap-2 text-sm text-ink/70">
-          <Banknote className="size-4" /> Paiement à la livraison : le livreur encaissera {formatGNF(order.cash_to_collect)}.
+          <Banknote className="size-4" /> Paiement à la livraison : le livreur encaisse {formatGNF(order.cash_to_collect)}, garde sa course
+          ({formatGNF(order.delivery_fee)}) et vous remet {formatGNF(order.cash_to_collect - order.delivery_fee)}.
         </p>
       )}
       {riders.map((r) => {

@@ -37,6 +37,9 @@ def vendor_order_timeline(vo):
             ("picked_up", "Colis récupéré par le livreur", delivery and delivery.picked_up_at, courier >= 2),
         ]
     steps.append(("delivered", "Livré au client" if home else "Déposé au point relais et remis", vo.delivered_at, rank >= 3))
+    if not online and delivery is not None and delivery.rider_id:
+        # Paiement à la livraison : le livreur remet l'argent du client à la boutique
+        steps.append(("cash", "Argent remis à la boutique", delivery.cash_handed_at, bool(delivery.cash_handed_at)))
     if online:
         paid = vo.received_at or vo.funds_released_at
         steps.append(("paid_out", "Réception confirmée, boutique payée", paid, bool(paid)))

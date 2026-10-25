@@ -59,12 +59,23 @@ class EscrowTests(OrderTestCase):
         release_escrow()  # deux passages : un seul versement
         self.assertEqual(LedgerEntry.objects.filter(user=self.madina.user).count(), 1)
 
-    def test_paiement_a_la_livraison_la_boutique_doit_la_commission(self):
+    def test_paiement_a_la_livraison_hors_de_guineemall(self):
         self.add(self.riz, 2)
         self.checkout()
         vo = VendorOrder.objects.get(vendor=self.madina)
         self.deliver(self.madina, vo)
-        self.assertEqual(balance(self.madina.user), -round(700_000 * RATE))
+        self.assertFalse(LedgerEntry.objects.exists())  # ni commission, ni dette
+
+    def test_paiement_a_la_livraison_reduction_guineemall_remboursee(self):
+        from apps.promotions.models import Coupon
+
+        Coupon.objects.create(code="TABASKI", type="fixed", value=50_000)  # code de la plateforme
+        self.add(self.riz, 2)
+        self.checkout(coupon_code="TABASKI")
+        vo = VendorOrder.objects.get(vendor=self.madina)
+        self.assertEqual(vo.platform_discount, 50_000)
+        self.deliver(self.madina, vo)
+        self.assertEqual(balance(self.madina.user), 50_000)
 
     def test_livreur_paye_et_dette_especes(self):
         self.add(self.riz, 1)
@@ -85,9 +96,14 @@ class EscrowTests(OrderTestCase):
         self.assertEqual(r.data["status"], "delivered")
         vo.refresh_from_db()
         self.assertEqual(vo.status, "delivered")
-        # Le livreur a encaissé 370 000 en espèces et gagne 20 000 : il doit 350 000
-        self.assertEqual(balance(rider_user), DELIVERY_FEE - (350_000 + DELIVERY_FEE))
-        self.assertEqual(balance(self.madina.user), 350_000 - round(350_000 * RATE))
+        # Espèces : rien ne passe par GuinéeMall. Le livreur a encaissé 370 000, garde 20 000 et remet 350 000
+        self.assertFalse(LedgerEntry.objects.exists())
+        self.assertEqual(r.data["cash_for_shop"], 350_000)
+        self.assertTrue(self.madina.user.notifications.filter(title__contains="vous doit").exists())
+        self.client.force_authenticate(self.madina.user)
+        r = self.client.post(f"/api/vendor/orders/{vo.pk}/cash-received/")
+        self.assertIsNotNone(r.data["courier"]["cash_handed_at"])
+        self.assertTrue(rider_user.notifications.filter(title__contains="Argent bien reçu").exists())
 
     def test_ambassadeur_touche_sa_commission(self):
         ambassadeur = self.make_client("amb@test.gn")

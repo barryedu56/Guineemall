@@ -39,9 +39,17 @@ def cash_debt(user):
     return max(0, -LedgerEntry.balance(user))
 
 
+def cash_for_shop(delivery):
+    """Paiement à la livraison : ce que le livreur remet à la boutique (le client paie tout, il garde sa course)."""
+    return max(0, cash_to_collect(delivery) - delivery.fee)
+
+
 def can_carry_cash(rider, amount):
-    """Plafond d'espèces : un livreur ne peut pas accumuler l'argent des clients sans le reverser."""
-    return amount == 0 or cash_debt(rider.user) + amount <= settings.RIDER_CASH_LIMIT
+    """
+    Un livreur qui doit encore de l'argent à GuinéeMall (anciennes courses en espèces) au-delà du plafond
+    ne prend plus de course en espèces tant qu'il n'a pas reversé.
+    """
+    return amount == 0 or cash_debt(rider.user) < settings.RIDER_CASH_LIMIT
 
 
 def offer_expires_at(delivery):
@@ -280,7 +288,30 @@ def delivered(delivery, rider, code):
         delivery.save(update_fields=["status", "delivered_at", "updated_at"])
         if delivery.vendor_order.status == VendorOrder.Status.READY:
             update_vendor_order_status(delivery.vendor_order, VendorOrder.Status.DELIVERED, rider.user, code_checked=True)
+        handover = cash_for_shop(delivery)
+        if handover:
+            vo = delivery.vendor_order
+            notify(vo.vendor.user, "delivery", f"{rider.user.name} vous doit {gnf(handover)} – commande #{vo.order_id}",
+                   f"Le client a payé en espèces. Le livreur garde sa course ({gnf(delivery.fee)}) et vous remet le reste. "
+                   "Confirmez dès que vous l'avez reçu.", vendor_link(delivery))
         notify_change(delivery)
+    return delivery
+
+
+@transaction.atomic
+def confirm_cash_received(delivery, vendor_user):
+    """La boutique confirme avoir reçu du livreur l'argent encaissé chez le client."""
+    delivery = Delivery.objects.select_for_update(of=("self",)).select_related("rider__user", "vendor_order").get(pk=delivery.pk)
+    if delivery.status != Delivery.Status.DELIVERED or not cash_for_shop(delivery):
+        raise OrderError("Aucun argent à recevoir du livreur pour cette commande.")
+    if delivery.cash_handed_at:
+        return delivery
+    delivery.cash_handed_at = timezone.now()
+    delivery.save(update_fields=["cash_handed_at", "updated_at"])
+    notify(delivery.rider.user, "delivery", "Argent bien reçu par la boutique ✅",
+           f"Commande #{delivery.vendor_order.order_id} : {gnf(cash_for_shop(delivery))} remis. Merci !", rider_link(delivery),
+           whatsapp=False)
+    notify_change(delivery)
     return delivery
 
 

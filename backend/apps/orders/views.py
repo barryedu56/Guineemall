@@ -236,6 +236,19 @@ class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, views
             raise ValidationError({"detail": str(e)})
         return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
 
+    @action(detail=True, methods=["post"], url_path="cash-received")
+    def cash_received(self, request, pk=None):
+        from apps.delivery.services import confirm_cash_received
+
+        delivery = getattr(self.get_object(), "delivery", None)
+        if delivery is None:
+            raise ValidationError({"detail": "Pas de livreur sur cette commande."})
+        try:
+            confirm_cash_received(delivery, request.user)
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
+
     @action(detail=True, methods=["post"])
     def withdraw(self, request, pk=None):
         from apps.delivery.services import withdraw

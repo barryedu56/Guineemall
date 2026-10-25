@@ -104,6 +104,8 @@ class Delivery(TimeStampedModel):
     declined_by = models.ManyToManyField(Rider, blank=True, related_name="declined_deliveries", verbose_name="refusée par")
     picked_up_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    # Paiement à la livraison : la boutique confirme avoir reçu l'argent du client des mains du livreur
+    cash_handed_at = models.DateTimeField("espèces remises à la boutique le", null=True, blank=True)
 
     class Meta:
         verbose_name = "livraison"

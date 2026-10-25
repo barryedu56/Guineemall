@@ -211,6 +211,8 @@ export interface Courier {
   fee: number
   offer_expires_at: string | null
   unread: number
+  cash_for_shop: number
+  cash_handed_at: string | null
   rider: { id: number; name: string; phone: string; avatar: string | null; vehicle_plate: string; rating: number | null } | null
 }
 
@@ -548,6 +550,8 @@ export interface RiderDelivery {
   status_label: string
   fee: number
   cash_to_collect: number
+  cash_for_shop: number
+  cash_handed_at: string | null
   items: { name: string; quantity: number }[]
   items_count: number
   pickup: {

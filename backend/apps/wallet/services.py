@@ -6,8 +6,9 @@ Quand une sous-commande est terminée, on répartit l'argent :
 - les frais de livraison vont au livreur GuinéeMall s'il y en a eu un, sinon à la boutique ;
 - l'ambassadeur qui a amené le client touche sa commission (prise sur la marge de la plateforme).
 
-Paiement à la livraison : celui qui livre a encaissé l'argent en espèces, son portefeuille
-est donc débité de ce montant (un solde négatif est une dette envers GuinéeMall).
+Paiement à la livraison : GuinéeMall reste en dehors. Le livreur encaisse le client, garde le prix
+de sa course et remet le reste à la boutique (ou la boutique encaisse elle-même). Pas de commission ;
+seule une réduction offerte par GuinéeMall (code promo de la plateforme) est remboursée à la boutique.
 
 Paiement en ligne : l'argent reste bloqué (séquestre) jusqu'à ce que le client confirme
 la réception, ou automatiquement ESCROW_AUTO_RELEASE_DAYS jours après la livraison.
@@ -25,6 +26,10 @@ from .models import CashDeposit, LedgerEntry, PayoutRequest
 
 
 def commission_for(vendor_order):
+    from apps.orders.models import Order
+
+    if vendor_order.order.payment_method == Order.PaymentMethod.CASH_ON_DELIVERY:
+        return 0  # l'argent ne passe pas par GuinéeMall
     base = vendor_order.subtotal - vendor_order.vendor_discount
     return round(base * vendor_order.vendor.effective_commission_rate)
 
@@ -48,7 +53,15 @@ def release_funds(vendor_order):
         return False
 
     order = vendor_order.order
-    cash = order.payment_method == Order.PaymentMethod.CASH_ON_DELIVERY
+    if order.payment_method == Order.PaymentMethod.CASH_ON_DELIVERY:
+        # Le client a payé en espèces la somme réduite : GuinéeMall rembourse sa propre réduction
+        _credit(vendor_order.vendor.user, LedgerEntry.Kind.SALE, vendor_order.platform_discount, vendor_order,
+                f"Commande #{order.id} : réduction offerte par GuinéeMall")
+        vendor_order.funds_released_at = timezone.now()
+        vendor_order.save(update_fields=["funds_released_at", "updated_at"])
+        return True
+
+    cash = False
     delivery = getattr(vendor_order, "delivery", None)
     rider = delivery.rider if delivery and delivery.status == "delivered" and delivery.rider else None
 
