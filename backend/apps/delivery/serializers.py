@@ -16,10 +16,29 @@ class PickupPointSerializer(serializers.ModelSerializer):
 
 
 class RiderSerializer(serializers.ModelSerializer):
+    rating = serializers.SerializerMethodField()
+    cash_debt = serializers.SerializerMethodField()
+    cash_limit = serializers.SerializerMethodField()
+
     class Meta:
         model = Rider
-        fields = ["city", "communes", "vehicle_plate", "is_approved", "is_available"]
+        fields = ["city", "communes", "vehicle_plate", "is_approved", "is_available", "rating", "cash_debt", "cash_limit"]
         read_only_fields = ["is_approved"]
+
+    def get_rating(self, rider):
+        from .services import rider_rating
+
+        return rider_rating(rider)
+
+    def get_cash_debt(self, rider):
+        from .services import cash_debt
+
+        return cash_debt(rider.user)
+
+    def get_cash_limit(self, rider):
+        from django.conf import settings
+
+        return settings.RIDER_CASH_LIMIT
 
 
 class RiderDeliverySerializer(serializers.ModelSerializer):
@@ -58,8 +77,9 @@ class RiderDeliverySerializer(serializers.ModelSerializer):
         }
 
     def get_cash_to_collect(self, delivery):
-        order = delivery.vendor_order.order
-        return delivery.vendor_order.total_amount if order.payment_method == "cash_on_delivery" else 0
+        from .services import cash_to_collect
+
+        return cash_to_collect(delivery)
 
     def get_items_count(self, delivery):
         return sum(i.quantity for i in delivery.vendor_order.items.all())

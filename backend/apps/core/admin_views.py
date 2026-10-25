@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import login
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -13,7 +14,7 @@ from apps.accounts.models import User
 from apps.delivery.models import Delivery, Rider
 from apps.orders.models import Order, VendorOrder
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import PayoutRequest
+from apps.wallet.models import CashDeposit, PayoutRequest
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -72,6 +73,10 @@ def dashboard(request):
             "payouts_amount": _money(pending_payouts, "amount"),
             "refunds_pending": Order.objects.filter(payment_status=Order.PaymentStatus.REFUND_PENDING).count(),
             "deliveries_open": Delivery.objects.filter(status=Delivery.Status.OPEN).count(),
+            "deposits_pending": CashDeposit.objects.filter(status=CashDeposit.Status.PENDING).count(),
+            "codes_blocked": VendorOrder.objects.filter(
+                status=VendorOrder.Status.READY, delivery_code_attempts__gte=settings.DELIVERY_CODE_MAX_ATTEMPTS
+            ).count(),
         },
         "orders_by_status": list(
             active.values("status").annotate(count=Count("id")).order_by("status")

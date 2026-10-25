@@ -98,3 +98,15 @@ class Delivery(TimeStampedModel):
         verbose_name_plural = "livraisons"
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["status"])]
+
+
+class DeliveryRating(models.Model):
+    """Note laissée par le client au livreur après la livraison."""
+
+    delivery = models.OneToOneField(Delivery, on_delete=models.CASCADE, related_name="rating")
+    rating = models.PositiveSmallIntegerField("note", choices=[(i, f"{i} ★") for i in range(1, 6)])
+    comment = models.CharField("commentaire", max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "note de livraison"

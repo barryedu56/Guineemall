@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Banknote, Bike, Clock, MapPin, Phone, Store, Wallet } from 'lucide-react'
+import { Banknote, Bike, Clock, MapPin, Phone, Star, Store, Wallet } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import Price from '../components/Price'
 import { Button, Empty, ErrorBox, Input, PhoneInput, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
+import { useRealtime } from '../context/realtime'
 import { useSiteConfig } from '../context/settings'
 import { api, errorMessage, formatPhone } from '../lib/api'
 import type { RiderDelivery, RiderProfile } from '../lib/types'
@@ -96,6 +97,15 @@ export function RiderDashboard() {
   })
   const active = mine?.results.filter((d) => d.status === 'assigned' || d.status === 'picked_up') ?? []
   const sharing = useShareLocation(active.some((d) => d.status === 'picked_up'))
+  const [codes, setCodes] = useState<Record<number, string>>({})
+
+  // Nouvelle course, désistement, annulation : la liste se met à jour dès la notification
+  useRealtime((event) => {
+    if (event.type === 'notification' && event.notification.kind === 'delivery') {
+      queryClient.invalidateQueries({ queryKey: ['rider-available'] })
+      queryClient.invalidateQueries({ queryKey: ['rider-mine'] })
+    }
+  })
 
   const updateProfile = useMutation({
     mutationFn: async (changes: Partial<RiderProfile>) => (await api.patch<RiderProfile>('/rider/profile/', changes)).data,
@@ -107,11 +117,13 @@ export function RiderDashboard() {
   })
 
   const act = useMutation({
-    mutationFn: ({ id, step }: { id: number; step: 'accept' | 'pickup' | 'deliver' }) => api.post(`/rider/deliveries/${id}/${step}/`),
+    mutationFn: ({ id, step }: { id: number; step: 'accept' | 'pickup' | 'deliver' | 'release' }) =>
+      api.post(`/rider/deliveries/${id}/${step}/`, step === 'deliver' ? { code: codes[id] ?? '' } : {}),
     onSuccess: () => {
       setError(null)
       queryClient.invalidateQueries({ queryKey: ['rider-available'] })
       queryClient.invalidateQueries({ queryKey: ['rider-mine'] })
+      queryClient.invalidateQueries({ queryKey: ['rider-profile'] })
     },
     onError: (e) => setError(errorMessage(e)),
   })
@@ -130,8 +142,31 @@ export function RiderDashboard() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold">Mes courses</h1>
-        <Link to="/portefeuille" className="flex items-center gap-2 font-semibold text-primary-dark"><Wallet className="size-5" /> Mon portefeuille</Link>
+        <div className="flex items-center gap-4">
+          {profile.rating.rating && (
+            <span className="flex items-center gap-1 font-semibold"><Star className="size-5 fill-primary text-primary" /> {profile.rating.rating} ({profile.rating.ratings_count})</span>
+          )}
+          <Link to="/portefeuille" className="flex items-center gap-2 font-semibold text-primary-dark"><Wallet className="size-5" /> Mon portefeuille</Link>
+        </div>
       </div>
+
+      {profile.cash_debt > 0 && (
+        <Link
+          to="/portefeuille"
+          className={`flex flex-wrap items-center gap-3 rounded-2xl p-4 font-semibold ${profile.cash_debt >= profile.cash_limit ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'}`}
+        >
+          <Banknote className="size-6" />
+          <span className="flex-1">
+            Espèces à reverser : <Price amount={profile.cash_debt} />
+            <span className="block text-sm font-normal">
+              {profile.cash_debt >= profile.cash_limit
+                ? 'Plafond atteint : reversez cet argent pour reprendre des courses payées en espèces.'
+                : <>Plafond : <Price amount={profile.cash_limit} />. Au-delà, plus de course payée en espèces.</>}
+            </span>
+          </span>
+          Reverser →
+        </Link>
+      )}
 
       <section className="card flex flex-wrap items-center gap-4 p-5">
         <button
@@ -167,11 +202,33 @@ export function RiderDashboard() {
           {active.map((d) => (
             <DeliveryCard key={d.id} delivery={d}>
               {d.status === 'assigned' ? (
-                <Button loading={act.isPending} onClick={() => act.mutate({ id: d.id, step: 'pickup' })}>J'ai récupéré le colis</Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button loading={act.isPending} onClick={() => act.mutate({ id: d.id, step: 'pickup' })}>J'ai récupéré le colis</Button>
+                  <Button variant="ghost" onClick={() => window.confirm('Rendre cette course ? Elle sera proposée aux autres livreurs.') && act.mutate({ id: d.id, step: 'release' })}>
+                    Je ne peux plus la faire
+                  </Button>
+                </div>
               ) : (
-                <Button loading={act.isPending} onClick={() => window.confirm('Colis remis au client ?') && act.mutate({ id: d.id, step: 'deliver' })}>
-                  Colis livré
-                </Button>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    act.mutate({ id: d.id, step: 'deliver' })
+                  }}
+                  className="flex flex-wrap items-end gap-3 rounded-2xl bg-primary-light p-4"
+                >
+                  <label className="flex-1 space-y-1">
+                    <span className="block text-sm font-semibold">Code donné par le client</span>
+                    <span className="block text-xs text-ink/60">Remettez le colis, puis demandez son code à 4 chiffres.</span>
+                    <input
+                      value={codes[d.id] ?? ''}
+                      onChange={(e) => setCodes({ ...codes, [d.id]: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                      inputMode="numeric"
+                      placeholder="••••"
+                      className="w-40 rounded-2xl border border-ink/15 bg-surface px-4 py-2.5 text-center font-mono text-2xl tracking-[0.4em]"
+                    />
+                  </label>
+                  <Button type="submit" disabled={(codes[d.id] ?? '').length !== 4} loading={act.isPending}>Colis livré</Button>
+                </form>
               )}
             </DeliveryCard>
           ))}
@@ -185,7 +242,11 @@ export function RiderDashboard() {
         ) : available.length ? (
           available.map((d) => (
             <DeliveryCard key={d.id} delivery={d}>
-              <Button loading={act.isPending} onClick={() => act.mutate({ id: d.id, step: 'accept' })}>Accepter la course</Button>
+              {d.cash_blocked ? (
+                <p className="text-sm font-medium text-red-700">Reversez d'abord vos espèces pour prendre cette course payée à la livraison.</p>
+              ) : (
+                <Button loading={act.isPending} onClick={() => act.mutate({ id: d.id, step: 'accept' })}>Accepter la course</Button>
+              )}
             </DeliveryCard>
           ))
         ) : (

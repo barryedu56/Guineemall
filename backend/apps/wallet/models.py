@@ -20,6 +20,7 @@ class LedgerEntry(models.Model):
         DELIVERY = "delivery", "Course de livraison"
         PAYOUT = "payout", "Retrait"
         PAYOUT_CANCELLED = "payout_cancelled", "Retrait refusé (remboursé)"
+        CASH_DEPOSIT = "cash_deposit", "Espèces reversées à la plateforme"
         ADJUSTMENT = "adjustment", "Ajustement"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="ledger_entries")
@@ -29,6 +30,7 @@ class LedgerEntry(models.Model):
         "orders.VendorOrder", on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_entries"
     )
     payout = models.ForeignKey("PayoutRequest", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    deposit = models.ForeignKey("CashDeposit", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     note = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -79,3 +81,39 @@ class PayoutRequest(TimeStampedModel):
 
     def __str__(self):
         return f"Retrait {gnf(self.amount)} – {self.user}"
+
+
+class CashDeposit(TimeStampedModel):
+    """
+    Argent reversé à la plateforme par un livreur (espèces encaissées chez les clients)
+    ou une boutique (commissions des ventes payées à la livraison). Confirmé par un admin.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "À vérifier"
+        CONFIRMED = "confirmed", "Confirmé"
+        REJECTED = "rejected", "Refusé"
+
+    class Method(models.TextChoices):
+        ORANGE_MONEY = "orange_money", "Orange Money"
+        MTN_MOMO = "mtn_momo", "MTN Mobile Money"
+        OFFICE = "office", "Dépôt en espèces au bureau"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="cash_deposits")
+    amount = models.PositiveBigIntegerField("montant (GNF)")
+    method = models.CharField(max_length=20, choices=Method.choices)
+    reference = models.CharField("référence du transfert / reçu", max_length=100)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    admin_note = models.CharField(max_length=255, blank=True)
+    processed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "versement d'espèces"
+        verbose_name_plural = "versements d'espèces"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Versement {gnf(self.amount)} – {self.user}"

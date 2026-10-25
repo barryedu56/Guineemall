@@ -81,13 +81,22 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = ["id", "product_slug", "product_name", "unit_price", "quantity", "subtotal"]
 
 
-def tracking(vendor_order):
-    """Suivi du livreur GuinéeMall, s'il y en a un."""
+def tracking(vendor_order, with_rating=False):
+    """Suivi du livreur, s'il y en a un (avec sa note moyenne et celle laissée par le client)."""
+    from apps.delivery.models import DeliveryRating
+    from apps.delivery.services import rider_rating
+
     delivery = getattr(vendor_order, "delivery", None)
     if delivery is None or delivery.status == "cancelled":
         return None
     rider = delivery.rider
+    extra = {}
+    if with_rating and rider:
+        given = DeliveryRating.objects.filter(delivery=delivery).values_list("rating", flat=True).first()
+        extra = {"rider_rating": rider_rating(rider)["rating"], "my_rating": given}
     return {
+        **extra,
+        "delivery_id": delivery.id,
         "status": delivery.status,
         "status_label": delivery.get_status_display(),
         "rider_name": rider.user.name if rider else None,
@@ -103,16 +112,21 @@ class VendorOrderSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
     tracking = serializers.SerializerMethodField()
+    delivery_code = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorOrder
         fields = [
             "id", "shop_name", "shop_slug", "subtotal", "delivery_fee", "vendor_discount", "platform_discount",
-            "total_amount", "status", "status_label", "received_at", "items", "tracking",
+            "total_amount", "status", "status_label", "received_at", "items", "tracking", "delivery_code",
         ]
 
     def get_tracking(self, vendor_order):
-        return tracking(vendor_order)
+        return tracking(vendor_order, with_rating=True)
+
+    def get_delivery_code(self, vendor_order):
+        # Uniquement pour le client, et seulement tant que le colis n'est pas remis
+        return vendor_order.delivery_code if vendor_order.status == VendorOrder.Status.READY else None
 
 
 class StatusHistorySerializer(serializers.ModelSerializer):
@@ -205,3 +219,4 @@ class VendorSideOrderSerializer(serializers.ModelSerializer):
 
 class VendorOrderStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=VendorOrder.Status.choices)
+    code = serializers.CharField(required=False, allow_blank=True, max_length=4)

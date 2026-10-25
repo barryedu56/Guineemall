@@ -1,13 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bike, CheckCircle2, Clock, MapPin, Package, Phone, Star, XCircle } from 'lucide-react'
+import { Bike, CheckCircle2, Clock, KeyRound, MapPin, Package, Phone, Star, XCircle } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import Price from '../components/Price'
+import { StarInput } from '../components/Stars'
 import { Button, Empty, ErrorBox, PageHeader, Pager, PhoneInput, Spinner, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useRealtime } from '../context/realtime'
 import { useSiteConfig } from '../context/settings'
+import { useToast } from '../context/toast'
 import { api, errorMessage, formatDate, formatPhone } from '../lib/api'
 import { startPayment } from '../lib/payment'
 import type { Order, Paginated } from '../lib/types'
@@ -203,11 +205,27 @@ export function OrderDetailPage() {
                 </li>
               ))}
             </ul>
-            {vo.tracking && vo.tracking.status !== 'open' && (
+            {vo.delivery_code && (
+              <div className="mt-3 flex flex-wrap items-center gap-4 rounded-2xl bg-ink p-4 text-white">
+                <KeyRound className="size-6 text-primary" />
+                <div className="flex-1">
+                  <p className="text-sm text-white/70">Code de livraison</p>
+                  <p className="font-mono text-3xl font-extrabold tracking-[0.3em] text-primary">{vo.delivery_code}</p>
+                </div>
+                <p className="max-w-xs text-sm text-white/70">
+                  Donnez-le uniquement quand le colis est entre vos mains. Sans ce code, personne ne peut déclarer la commande livrée.
+                </p>
+              </div>
+            )}
+            {vo.tracking?.status === 'delivered' && vo.tracking.rider_name && (
+              <RateRider deliveryId={vo.tracking.delivery_id} riderName={vo.tracking.rider_name} given={vo.tracking.my_rating ?? null} orderKey={key} />
+            )}
+            {vo.tracking && vo.tracking.status !== 'open' && vo.tracking.status !== 'delivered' && (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-background p-3 text-sm">
                 <Bike className="size-5 text-primary-dark" />
                 <span className="font-medium">{vo.tracking.status_label}</span>
                 {vo.tracking.rider_name && <span>· {vo.tracking.rider_name}</span>}
+                {vo.tracking.rider_rating && <span className="text-ink/60">★ {vo.tracking.rider_rating}</span>}
                 {vo.tracking.rider_phone && (
                   <a href={`tel:${vo.tracking.rider_phone}`} className="flex items-center gap-1 text-primary-dark"><Phone className="size-4" /> Appeler</a>
                 )}
@@ -268,6 +286,35 @@ export function OrderDetailPage() {
           Annuler la commande
         </Button>
       )}
+    </div>
+  )
+}
+
+/** Note du livreur par le client, une fois le colis reçu. */
+function RateRider({ deliveryId, riderName, given, orderKey }: { deliveryId: number; riderName: string; given: number | null; orderKey: unknown[] }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const rate = useMutation({
+    mutationFn: () => api.post(`/delivery/${deliveryId}/rate/`, { rating, comment }),
+    onSuccess: () => {
+      toast('Merci pour votre note !')
+      queryClient.invalidateQueries({ queryKey: orderKey })
+    },
+    onError: (e) => toast(errorMessage(e), 'error'),
+  })
+  if (given) {
+    return <p className="mt-3 text-sm text-ink/60">Vous avez noté {riderName} : {'★'.repeat(given)}</p>
+  }
+  return (
+    <div className="mt-3 space-y-3 rounded-2xl bg-background p-4">
+      <p className="font-semibold">Comment s'est passée la livraison avec {riderName} ?</p>
+      <StarInput value={rating} onChange={setRating} />
+      <div className="flex gap-2">
+        <input value={comment} onChange={(e) => setComment(e.target.value)} maxLength={300} placeholder="Un commentaire (facultatif)" className="min-w-0 flex-1 rounded-full border border-ink/10 bg-surface px-4 py-2 text-sm" />
+        <Button size="sm" loading={rate.isPending} onClick={() => rate.mutate()}>Noter</Button>
+      </div>
     </div>
   )
 }

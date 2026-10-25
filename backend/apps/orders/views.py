@@ -178,8 +178,14 @@ class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, views
     def status(self, request, pk=None):
         payload = VendorOrderStatusSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
+        new_status = payload.validated_data["status"]
+        vendor_order = self.get_object()
         try:
-            services.update_vendor_order_status(self.get_object(), payload.validated_data["status"], request.user)
+            # La boutique qui livre elle-même (ou remet au point relais) doit saisir le code du client
+            checked = new_status == VendorOrder.Status.DELIVERED and services.check_delivery_code(
+                vendor_order, payload.validated_data.get("code")
+            )
+            services.update_vendor_order_status(vendor_order, new_status, request.user, code_checked=checked)
         except services.OrderError as e:
             raise ValidationError({"detail": str(e)})
         return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)

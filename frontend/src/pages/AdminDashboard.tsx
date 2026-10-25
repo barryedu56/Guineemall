@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  BadgeCheck, Bike, ExternalLink, Package, RotateCcw, Settings, ShoppingBag, Store, TrendingUp, Truck, Users, Wallet,
+  Banknote, BadgeCheck, Bike, KeyRound, ExternalLink, Package, RotateCcw, Settings, ShoppingBag, Store, TrendingUp, Truck, Users, Wallet,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -22,6 +22,8 @@ interface Dashboard {
     payouts_amount: number
     refunds_pending: number
     deliveries_open: number
+    deposits_pending: number
+    codes_blocked: number
   }
   recent_orders: { id: number; client: string; total: number; status: string; status_label: string; payment_label: string; created_at: string }[]
   top_shops: { shop_name: string; slug: string; revenue: number }[]
@@ -61,6 +63,8 @@ export default function AdminDashboard() {
     { count: data.todo.payouts_pending, label: 'retrait(s) à payer', icon: Wallet, path: 'wallet/payoutrequest/?status__exact=pending', amount: data.todo.payouts_amount },
     { count: data.todo.refunds_pending, label: 'remboursement(s) à faire', icon: RotateCcw, path: 'orders/order/?payment_status__exact=refund_pending' },
     { count: data.todo.deliveries_open, label: 'course(s) sans livreur', icon: Truck, path: 'delivery/delivery/?status__exact=open' },
+    { count: data.todo.deposits_pending, label: "versement(s) d'espèces à vérifier", icon: Banknote, path: 'wallet/cashdeposit/?status__exact=pending' },
+    { count: data.todo.codes_blocked, label: 'code(s) de livraison bloqué(s)', icon: KeyRound, path: 'orders/vendororder/?status__exact=ready' },
   ]
   const pending = todo.filter((t) => t.count > 0)
 

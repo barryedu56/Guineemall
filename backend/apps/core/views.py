@@ -7,7 +7,7 @@ from apps.delivery.models import DeliveryZone
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Coupon
 from apps.vendors.models import VerificationRequest
-from apps.wallet.models import PayoutRequest
+from apps.wallet.models import CashDeposit, PayoutRequest
 
 from .models import SiteSettings
 
@@ -82,6 +82,7 @@ def site_config(request):
             ],
             "document_type": choices(VerificationRequest.DocumentType),
             "payout_method": choices(PayoutRequest.Method),
+            "deposit_method": choices(CashDeposit.Method),
             "coupon_type": choices(Coupon.Type),
             "product_sort": [
                 {"value": "-created_at", "label": "Plus récents"},
@@ -96,5 +97,6 @@ def site_config(request):
         "commission_rate": settings.PLATFORM_COMMISSION_RATE,
         "escrow_days": settings.ESCROW_AUTO_RELEASE_DAYS,
         "unpaid_timeout_minutes": settings.UNPAID_ORDER_TIMEOUT_MINUTES,
+        "rider_cash_limit": settings.RIDER_CASH_LIMIT,
         "page_size": 20,
     })

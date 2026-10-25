@@ -20,7 +20,7 @@ from django.utils import timezone
 from apps.core.formatting import gnf
 from apps.notifications.services import notify
 
-from .models import LedgerEntry, PayoutRequest
+from .models import CashDeposit, LedgerEntry, PayoutRequest
 
 
 def commission_for(vendor_order):
@@ -114,3 +114,36 @@ def process_payout(payout, admin, paid, reference="", note=""):
         notify(payout.user, "wallet", "Retrait refusé", note or "Contactez GuinéeMall pour plus d'informations.",
                "/portefeuille")
     return payout
+
+
+def declare_deposit(user, amount, method, reference):
+    """Le livreur (ou la boutique) déclare avoir reversé de l'argent ; un admin confirme ensuite."""
+    debt = max(0, -LedgerEntry.balance(user))
+    pending = sum(user.cash_deposits.filter(status=CashDeposit.Status.PENDING).values_list("amount", flat=True))
+    if amount <= 0:
+        raise ValueError("Le montant doit être positif.")
+    if amount > debt - pending:
+        raise ValueError(f"Vous ne devez que {gnf(max(0, debt - pending))} (versements en attente déduits).")
+    return CashDeposit.objects.create(user=user, amount=amount, method=method, reference=reference)
+
+
+@transaction.atomic
+def process_deposit(deposit, admin, confirmed, note=""):
+    deposit = CashDeposit.objects.select_for_update().get(pk=deposit.pk)
+    if deposit.status != CashDeposit.Status.PENDING:
+        return deposit
+    deposit.status = CashDeposit.Status.CONFIRMED if confirmed else CashDeposit.Status.REJECTED
+    deposit.admin_note = note
+    deposit.processed_by = admin
+    deposit.processed_at = timezone.now()
+    deposit.save()
+    if confirmed:
+        LedgerEntry.objects.create(
+            user=deposit.user, kind=LedgerEntry.Kind.CASH_DEPOSIT, amount=deposit.amount, deposit=deposit,
+            note=f"{deposit.get_method_display()} – réf. {deposit.reference}",
+        )
+        notify(deposit.user, "wallet", "Versement confirmé ✅", f"{gnf(deposit.amount)} bien reçus. Merci !", "/portefeuille")
+    else:
+        notify(deposit.user, "wallet", "Versement non reconnu",
+               note or "Nous n'avons pas trouvé ce versement. Vérifiez la référence.", "/portefeuille")
+    return deposit

@@ -97,7 +97,7 @@ class VendorOrderTests(OrderTestCase):
     def set_status(self, vendor, vo, new_status):
         self.client.force_authenticate(vendor.user)
         with self.captureOnCommitCallbacks(execute=True):
-            return self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status})
+            return self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status, **({"code": VendorOrder.objects.get(pk=vo.pk).delivery_code} if new_status == "delivered" else {})})
 
     def test_parcours_complet_jusqu_a_livree(self):
         for s in ["confirmed", "preparing", "ready", "delivered"]:

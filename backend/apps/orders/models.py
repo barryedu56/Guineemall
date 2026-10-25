@@ -127,6 +127,12 @@ class VendorOrder(TimeStampedModel):
     total_amount = models.PositiveBigIntegerField("total payé par le client (GNF)")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
 
+    # Code secret donné au client quand le colis est prêt : sans lui, impossible de marquer « livrée »
+    delivery_code = models.CharField("code de livraison", max_length=4, blank=True)
+    delivery_code_attempts = models.PositiveSmallIntegerField(
+        "codes faux saisis", default=0, help_text="Remettre à 0 pour débloquer après vérification"
+    )
+
     # Séquestre : l'argent est versé au vendeur après confirmation de réception
     delivered_at = models.DateTimeField(null=True, blank=True)
     received_at = models.DateTimeField("réception confirmée le", null=True, blank=True)

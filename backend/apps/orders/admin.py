@@ -22,8 +22,13 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(VendorOrder)
 class VendorOrderAdmin(admin.ModelAdmin):
-    list_display = ["order", "vendor", "total_amount", "status"]
+    list_display = ["order", "vendor", "total_amount", "status", "delivery_code_attempts"]
     list_filter = ["status"]
+    actions = ["unlock_code"]
+
+    @admin.action(description="Débloquer le code de livraison (après vérification)")
+    def unlock_code(self, request, queryset):
+        queryset.update(delivery_code_attempts=0)
 
 
 admin.site.register(OrderItem)

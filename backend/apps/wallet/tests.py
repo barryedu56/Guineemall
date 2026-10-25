@@ -29,7 +29,7 @@ class EscrowTests(OrderTestCase):
     def set_status(self, vendor, vo, new_status):
         self.client.force_authenticate(vendor.user)
         with self.captureOnCommitCallbacks(execute=True):
-            r = self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status})
+            r = self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": new_status, **({"code": VendorOrder.objects.get(pk=vo.pk).delivery_code} if new_status == "delivered" else {})})
         self.client.force_authenticate(self.user)
         return r
 
@@ -79,7 +79,7 @@ class EscrowTests(OrderTestCase):
         self.client.post(f"/api/rider/deliveries/{delivery.pk}/accept/")
         self.client.post(f"/api/rider/deliveries/{delivery.pk}/pickup/")
         with self.captureOnCommitCallbacks(execute=True):
-            r = self.client.post(f"/api/rider/deliveries/{delivery.pk}/deliver/")
+            r = self.client.post(f"/api/rider/deliveries/{delivery.pk}/deliver/", {"code": VendorOrder.objects.get(pk=vo.pk).delivery_code})
         self.assertEqual(r.data["status"], "delivered")
         vo.refresh_from_db()
         self.assertEqual(vo.status, "delivered")

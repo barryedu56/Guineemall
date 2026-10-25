@@ -4,6 +4,7 @@ from . import views
 
 router = SimpleRouter()
 router.register("wallet/payouts", views.PayoutViewSet, basename="payout")
+router.register("wallet/deposits", views.CashDepositViewSet, basename="deposit")
 router.register("wallet", views.WalletViewSet, basename="wallet")
 
 urlpatterns = router.urls

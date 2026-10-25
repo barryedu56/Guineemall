@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import generics, mixins, permissions, serializers, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
@@ -67,6 +67,27 @@ class RiderProfileView(generics.RetrieveUpdateAPIView):
         return generics.get_object_or_404(Rider, user=self.request.user)
 
 
+class RateSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=300)
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def rate_delivery(request, pk):
+    """Le client note le livreur après la livraison."""
+    delivery = generics.get_object_or_404(
+        Delivery.objects.select_related("vendor_order__order", "rider"), pk=pk, vendor_order__order__user=request.user
+    )
+    payload = RateSerializer(data=request.data)
+    payload.is_valid(raise_exception=True)
+    try:
+        services.rate(delivery, request.user, **payload.validated_data)
+    except OrderError as e:
+        raise ValidationError({"detail": str(e)})
+    return Response(status=status.HTTP_201_CREATED)
+
+
 class LocationSerializer(serializers.Serializer):
     latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
@@ -106,7 +127,12 @@ class RiderDeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
 
     @action(detail=False)
     def available(self, request):
-        return Response(self.get_serializer(self.get_queryset(), many=True).data)
+        rider = request.user.rider
+        data = self.get_serializer(self.get_queryset(), many=True).data
+        # Course en espèces impossible si elle ferait dépasser le plafond d'espèces non reversées
+        for item in data:
+            item["cash_blocked"] = not services.can_carry_cash(rider, item["cash_to_collect"])
+        return Response(data)
 
     def _run(self, fn):
         try:
@@ -125,7 +151,12 @@ class RiderDeliveryViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vie
 
     @action(detail=True, methods=["post"])
     def deliver(self, request, pk=None):
-        return self._run(services.delivered)
+        code = str(request.data.get("code", ""))
+        return self._run(lambda delivery, rider: services.delivered(delivery, rider, code))
+
+    @action(detail=True, methods=["post"])
+    def release(self, request, pk=None):
+        return self._run(services.release)
 
     @action(detail=False, methods=["post"])
     def location(self, request):

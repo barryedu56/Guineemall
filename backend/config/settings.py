@@ -185,6 +185,9 @@ AFFILIATE_COMMISSION_RATE = env.float("AFFILIATE_COMMISSION_RATE", default=0.02)
 ESCROW_AUTO_RELEASE_DAYS = 3  # paiement versé au vendeur si le client ne confirme pas la réception
 UNPAID_ORDER_TIMEOUT_MINUTES = 30
 REFERRAL_REWARD_GNF = 10_000
+# Un livreur qui doit plus que ce montant (espèces encaissées non reversées) ne prend plus de course en espèces
+RIDER_CASH_LIMIT = env.int("RIDER_CASH_LIMIT", default=2_000_000)
+DELIVERY_CODE_MAX_ATTEMPTS = 5
 
 # Paiements : "simulation" en développement, "live" avec les vraies clés
 PAYMENT_MODE = env("PAYMENT_MODE", default="simulation")

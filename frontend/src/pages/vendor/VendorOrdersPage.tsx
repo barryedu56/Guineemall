@@ -82,8 +82,12 @@ function VendorOrderCard({
   const actionLabel = (status: VendorOrderStatus) =>
     config?.choices.vendor_order_status.find((c) => c.value === status)?.action ?? status
   const [error, setError] = useState<string | null>(null)
+  // « Marquer livrée » demande le code reçu par le client (preuve de remise du colis)
+  const [askCode, setAskCode] = useState(false)
+  const [code, setCode] = useState('')
   const update = useMutation({
-    mutationFn: (status: VendorOrderStatus) => api.post(`/vendor/orders/${order.id}/status/`, { status }),
+    mutationFn: (status: VendorOrderStatus) =>
+      api.post(`/vendor/orders/${order.id}/status/`, status === 'delivered' ? { status, code } : { status }),
     onSuccess: (_, status) => {
       queryClient.invalidateQueries({ queryKey: ['vendor-orders'] })
       const label = config?.choices.vendor_order_status.find((c) => c.value === status)?.label ?? status
@@ -172,12 +176,40 @@ function VendorOrderCard({
               variant={status === 'cancelled' ? 'outline' : 'primary'}
               className={status === 'cancelled' ? 'text-red-600' : ''}
               loading={update.isPending && update.variables === status}
-              onClick={() => (status !== 'cancelled' || window.confirm('Annuler cette commande ? Le stock sera remis.')) && update.mutate(status)}
+              onClick={() => {
+                if (status === 'delivered') return setAskCode(true)
+                if (status !== 'cancelled' || window.confirm('Annuler cette commande ? Le stock sera remis.')) update.mutate(status)
+              }}
             >
               {actionLabel(status)}
             </Button>
           ))}
         </div>
+      )}
+      {askCode && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            setError(null)
+            update.mutate('delivered')
+          }}
+          className="flex flex-wrap items-end gap-3 rounded-2xl bg-primary-light p-4"
+        >
+          <label className="flex-1 space-y-1">
+            <span className="block text-sm font-semibold">Code de livraison du client</span>
+            <span className="block text-xs text-ink/60">Le client l'a reçu par notification. Demandez-le au moment de remettre le colis.</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              inputMode="numeric"
+              autoFocus
+              placeholder="••••"
+              className="w-40 rounded-2xl border border-ink/15 bg-surface px-4 py-2.5 text-center font-mono text-2xl tracking-[0.4em]"
+            />
+          </label>
+          <Button type="submit" disabled={code.length !== 4} loading={update.isPending}>Valider la remise</Button>
+          <Button type="button" variant="ghost" onClick={() => setAskCode(false)}>Annuler</Button>
+        </form>
       )}
     </article>
   )

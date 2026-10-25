@@ -3,11 +3,12 @@ import { Lock, Wallet as WalletIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import Price from '../components/Price'
-import { AmountInput, Badge, Button, ErrorBox, PhoneInput, Select, Spinner } from '../components/ui'
+import { AmountInput, Badge, Button, ErrorBox, Input, PhoneInput, Select, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
+import { useToast } from '../context/toast'
 import { api, errorMessage, formatDate, formatPhone } from '../lib/api'
-import type { Payout, Wallet } from '../lib/types'
+import type { CashDeposit, Payout, Wallet } from '../lib/types'
 
 /** Portefeuille : vendeurs (ventes), ambassadeurs (commissions), livreurs (courses). */
 export default function WalletPage() {
@@ -66,6 +67,8 @@ export default function WalletPage() {
         )}
       </div>
 
+      {wallet.debt > 0 && <DepositForm debt={wallet.debt} />}
+
       <form onSubmit={submit} className="space-y-3 card p-6">
         <h2 className="text-lg font-semibold">Retirer mon argent</h2>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -118,5 +121,57 @@ export default function WalletPage() {
         )}
       </section>
     </div>
+  )
+}
+
+/** Le livreur (ou la boutique) déclare avoir reversé l'argent dû ; l'équipe confirme à réception. */
+function DepositForm({ debt }: { debt: number }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const { data: config } = useSiteConfig()
+  const [form, setForm] = useState({ amount: String(debt), method: '', reference: '' })
+  const method = form.method || config?.choices.deposit_method[0]?.value || ''
+  const { data: deposits = [] } = useQuery({
+    queryKey: ['deposits'],
+    queryFn: async () => (await api.get<CashDeposit[]>('/wallet/deposits/')).data,
+  })
+  const declare = useMutation({
+    mutationFn: () => api.post('/wallet/deposits/', { ...form, method, amount: Number(form.amount) }),
+    onSuccess: () => {
+      toast("Versement déclaré : l'équipe le vérifie")
+      setForm({ ...form, reference: '' })
+      queryClient.invalidateQueries({ queryKey: ['deposits'] })
+    },
+    onError: (e) => toast(errorMessage(e), 'error'),
+  })
+
+  return (
+    <section className="card space-y-4 border-2 border-amber-300 p-6">
+      <div>
+        <h2 className="text-lg font-bold">Argent à reverser : <Price amount={debt} /></h2>
+        <p className="text-sm text-ink/60">Espèces encaissées chez les clients ou commissions des ventes payées à la livraison.</p>
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); declare.mutate() }} className="grid gap-3 sm:grid-cols-3">
+        <AmountInput label="Montant reversé (GNF)" value={form.amount} onValueChange={(amount) => setForm({ ...form, amount })} required />
+        <Select label="Comment" value={method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
+          {config?.choices.deposit_method.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </Select>
+        <Input label="Référence du transfert / n° de reçu" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} required />
+        <Button type="submit" loading={declare.isPending} className="w-fit">J'ai reversé cet argent</Button>
+      </form>
+      {deposits.length > 0 && (
+        <ul className="divide-y divide-ink/5 text-sm">
+          {deposits.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-2 py-2">
+              <span>{formatDate(d.created_at)} · {d.method_label} · réf. {d.reference}</span>
+              <span className="flex items-center gap-2">
+                <Price amount={d.amount} />
+                <Badge tone={d.status === 'confirmed' ? 'success' : d.status === 'rejected' ? 'danger' : 'warning'}>{d.status_label}</Badge>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

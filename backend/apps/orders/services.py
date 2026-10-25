@@ -12,15 +12,18 @@ Ajouts v2 : frais de livraison par commune ou point relais, codes promo,
 ambassadeurs, paiement en ligne avec séquestre, livreurs, notifications.
 """
 
+import hmac
+import secrets
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from apps.core.formatting import gnf
 from apps.catalog.models import Product
+from apps.core.formatting import gnf
 from apps.delivery.models import Delivery, DeliveryZone
 from apps.notifications.services import notify
 from apps.promotions.models import CouponRedemption
@@ -45,6 +48,29 @@ VENDOR_ORDER_TRANSITIONS = {
 
 CANCELLABLE_VENDOR_STATUSES = [VendorOrder.Status.PENDING, VendorOrder.Status.CONFIRMED]
 ONLINE_METHODS = [Order.PaymentMethod.ORANGE_MONEY, Order.PaymentMethod.MTN_MOMO, Order.PaymentMethod.CARD]
+
+
+def new_delivery_code():
+    return f"{secrets.randbelow(10_000):04d}"
+
+
+def check_delivery_code(vendor_order, code):
+    """
+    Vérifie le code de livraison donné par le client. À appeler hors transaction :
+    chaque code faux est compté, et après DELIVERY_CODE_MAX_ATTEMPTS la livraison est bloquée
+    jusqu'à ce qu'un admin la débloque (protection contre les essais au hasard).
+    """
+    vendor_order.refresh_from_db(fields=["delivery_code", "delivery_code_attempts"])
+    if vendor_order.delivery_code_attempts >= settings.DELIVERY_CODE_MAX_ATTEMPTS:
+        raise OrderError("Trop de codes faux : la livraison est bloquée. Contactez le service client.")
+    if not vendor_order.delivery_code or not hmac.compare_digest(vendor_order.delivery_code, str(code or "").strip()):
+        VendorOrder.objects.filter(pk=vendor_order.pk).update(delivery_code_attempts=F("delivery_code_attempts") + 1)
+        left = settings.DELIVERY_CODE_MAX_ATTEMPTS - vendor_order.delivery_code_attempts - 1
+        raise OrderError(
+            "Code de livraison incorrect. Demandez au client le code reçu par notification"
+            + (f" ({left} essai(s) restant(s))." if left > 0 else ". La livraison est maintenant bloquée.")
+        )
+    return True
 
 
 def allowed_vendor_transitions(vendor_order):
@@ -341,7 +367,11 @@ def cancel_order(order, user):
 
 
 @transaction.atomic
-def update_vendor_order_status(vendor_order, new_status, user):
+def update_vendor_order_status(vendor_order, new_status, user, code_checked=False):
+    """
+    Fait avancer une sous-commande. Passer en « livrée » exige d'avoir vérifié le code
+    du client avec check_delivery_code() (code_checked=True), que ce soit la boutique ou le livreur.
+    """
     vendor_order = VendorOrder.objects.select_for_update().select_related("order__user").get(pk=vendor_order.pk)
     order = vendor_order.order
     if not is_visible_to_vendor(order):
@@ -352,8 +382,15 @@ def update_vendor_order_status(vendor_order, new_status, user):
             f"à « {VendorOrder.Status(new_status).label} »."
         )
 
+    if new_status == VendorOrder.Status.DELIVERED and not code_checked:
+        raise OrderError("Saisissez le code de livraison donné par le client.")
+
     vendor_order.status = new_status
     fields = ["status", "updated_at"]
+    if new_status == VendorOrder.Status.READY:
+        vendor_order.delivery_code = new_delivery_code()
+        vendor_order.delivery_code_attempts = 0
+        fields += ["delivery_code", "delivery_code_attempts"]
     if new_status == VendorOrder.Status.DELIVERED:
         vendor_order.delivered_at = timezone.now()
         fields.append("delivered_at")
@@ -364,11 +401,21 @@ def update_vendor_order_status(vendor_order, new_status, user):
         _flag_refund(order)
     if new_status == VendorOrder.Status.READY and order.delivery_method == Order.DeliveryMethod.HOME:
         # Course proposée aux livreurs GuinéeMall (la boutique peut aussi livrer elle-même)
-        Delivery.objects.get_or_create(vendor_order=vendor_order, defaults={"fee": vendor_order.delivery_fee})
+        delivery, created = Delivery.objects.get_or_create(vendor_order=vendor_order, defaults={"fee": vendor_order.delivery_fee})
+        if created:
+            from apps.delivery.services import announce_to_riders
+
+            transaction.on_commit(lambda: announce_to_riders(delivery))
     if new_status == VendorOrder.Status.DELIVERED:
-        Delivery.objects.filter(vendor_order=vendor_order, status=Delivery.Status.OPEN).update(
-            status=Delivery.Status.CANCELLED
-        )
+        # La boutique a livré elle-même : la course est retirée (et le livreur prévenu s'il l'avait acceptée)
+        for delivery in Delivery.objects.filter(
+            vendor_order=vendor_order, status__in=[Delivery.Status.OPEN, Delivery.Status.ASSIGNED]
+        ).select_related("rider__user"):
+            delivery.status = Delivery.Status.CANCELLED
+            delivery.save(update_fields=["status", "updated_at"])
+            if delivery.rider:
+                notify(delivery.rider.user, "delivery", f"Course annulée – commande #{order.id}",
+                       f"{vendor_order.vendor.shop_name} a livré le colis elle-même.", "/livreur")
 
     OrderStatusHistory.objects.create(
         order=order, status=new_status, changed_by=user,
@@ -384,6 +431,11 @@ def update_vendor_order_status(vendor_order, new_status, user):
     }
     if new_status in messages:
         body = f"{vendor_order.vendor.shop_name} {messages[new_status]}"
+        if new_status == VendorOrder.Status.READY:
+            body += (
+                f" Votre code de livraison : {vendor_order.delivery_code}."
+                " Donnez-le uniquement à la personne qui vous remet le colis."
+            )
         if new_status == VendorOrder.Status.DELIVERED and order.payment_method in ONLINE_METHODS:
             body += " Confirmez la réception pour que la boutique soit payée."
         notify(order.user, "order", f"Commande #{order.id}", body, f"/commandes/{order.id}")

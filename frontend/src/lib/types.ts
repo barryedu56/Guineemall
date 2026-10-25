@@ -129,6 +129,9 @@ export interface OrderItem {
 }
 
 export interface Tracking {
+  delivery_id: number
+  rider_rating?: number | null
+  my_rating?: number | null
   status: string
   status_label: string
   rider_name: string | null
@@ -172,6 +175,7 @@ export interface Order {
     received_at: string | null
     items: OrderItem[]
     tracking: Tracking | null
+    delivery_code: string | null
   }[]
   status_history: { status: string; note: string; created_at: string }[]
   created_at: string
@@ -266,6 +270,7 @@ export interface SiteConfig {
     vendor_order_status: (Choice & { action: string })[]
     document_type: Choice[]
     payout_method: Choice[]
+    deposit_method: Choice[]
     coupon_type: Choice[]
     product_sort: Choice[]
   }
@@ -276,6 +281,7 @@ export interface SiteConfig {
   commission_rate: number
   escrow_days: number
   unpaid_timeout_minutes: number
+  rider_cash_limit: number
   page_size: number
 }
 
@@ -343,6 +349,7 @@ export interface Message {
 }
 
 export interface Wallet {
+  debt: number
   balance: number
   available: number
   pending_payouts: number
@@ -444,8 +451,21 @@ export interface VendorStats {
   top_products: { product_name: string; sold: number; revenue: number }[]
 }
 
+export interface CashDeposit {
+  id: number
+  amount: number
+  method: string
+  method_label: string
+  reference: string
+  status: 'pending' | 'confirmed' | 'rejected'
+  status_label: string
+  admin_note: string
+  created_at: string
+}
+
 export interface RiderDelivery {
   id: number
+  cash_blocked?: boolean
   order_id: number
   status: 'open' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled'
   status_label: string
@@ -472,4 +492,7 @@ export interface RiderProfile {
   vehicle_plate: string
   is_approved: boolean
   is_available: boolean
+  rating: { rating: number | null; ratings_count: number }
+  cash_debt: number
+  cash_limit: number
 }

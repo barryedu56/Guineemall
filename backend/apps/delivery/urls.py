@@ -11,5 +11,6 @@ router.register("rider/deliveries", views.RiderDeliveryViewSet, basename="rider-
 urlpatterns = [
     path("auth/register/rider/", views.RiderRegisterView.as_view(), name="register-rider"),
     path("rider/profile/", views.RiderProfileView.as_view(), name="rider-profile"),
+    path("delivery/<int:pk>/rate/", views.rate_delivery, name="rate-delivery"),
     *router.urls,
 ]
