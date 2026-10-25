@@ -7,7 +7,7 @@ from apps.delivery.models import DeliveryZone, PickupPoint, Rider
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Campaign, Coupon
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import CashDeposit, PayoutRequest
+from apps.wallet.models import CashDeposit, CreditEntry, CreditRefund, PayoutRequest
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -133,7 +133,8 @@ class AdminOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            "id", "client", "subtotal", "delivery_fee", "discount_amount", "total_amount", "status", "status_label",
+            "id", "client", "subtotal", "delivery_fee", "discount_amount", "total_amount", "credit_used", "refunded_amount",
+            "status", "status_label",
             "payment_method", "payment_method_label", "payment_status", "payment_status_label", "delivery_method",
             "delivery_city", "delivery_commune", "delivery_quartier", "delivery_landmark", "delivery_phone",
             "delivery_name", "shops", "created_at",
@@ -174,6 +175,23 @@ class AdminPayoutSerializer(serializers.ModelSerializer):
         from apps.wallet.models import LedgerEntry
 
         return LedgerEntry.balance(payout.user)
+
+
+class AdminCreditRefundSerializer(serializers.ModelSerializer):
+    user = UserMiniSerializer(read_only=True)
+    method_label = serializers.CharField(source="get_method_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    credit_balance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CreditRefund
+        fields = [
+            "id", "user", "amount", "method", "method_label", "phone", "status", "status_label",
+            "transaction_reference", "admin_note", "credit_balance", "created_at", "processed_at",
+        ]
+
+    def get_credit_balance(self, refund):
+        return CreditEntry.balance(refund.user)
 
 
 class AdminDepositSerializer(serializers.ModelSerializer):

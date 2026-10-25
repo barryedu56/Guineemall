@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import CashDeposit, LedgerEntry, PayoutRequest
+from .models import CashDeposit, CreditEntry, CreditRefund, LedgerEntry, PayoutRequest
 from .services import process_deposit, process_payout
 
 
@@ -53,3 +53,21 @@ class CashDepositAdmin(admin.ModelAdmin):
         for deposit in queryset.filter(status=CashDeposit.Status.PENDING):
             process_deposit(deposit, request.user, confirmed=False, note=deposit.admin_note)
         messages.success(request, "Versements refusés.")
+
+
+@admin.register(CreditEntry)
+class CreditEntryAdmin(admin.ModelAdmin):
+    list_display = ["user", "kind", "amount", "order", "note", "created_at"]
+    list_filter = ["kind"]
+    search_fields = ["user__email", "user__name", "note"]
+    raw_id_fields = ["user", "order", "refund"]
+
+    def has_change_permission(self, request, obj=None):
+        return False  # un mouvement ne se modifie pas : on ajoute un « ajustement »
+
+
+@admin.register(CreditRefund)
+class CreditRefundAdmin(admin.ModelAdmin):
+    list_display = ["user", "amount", "method", "phone", "status", "created_at"]
+    list_filter = ["status", "method"]
+    readonly_fields = ["user", "amount", "method", "phone", "status", "processed_by", "processed_at"]

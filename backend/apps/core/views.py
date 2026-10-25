@@ -10,7 +10,7 @@ from apps.delivery.models import Delivery, DeliveryZone, PickupPoint
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Coupon
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import CashDeposit, PayoutRequest
+from apps.wallet.models import CashDeposit, CreditRefund, PayoutRequest
 
 from .models import SiteSettings
 
@@ -103,6 +103,7 @@ def site_config(request):
             "deposit_method": choices(CashDeposit.Method),
             "deposit_status": choices(CashDeposit.Status),
             "payout_status": choices(PayoutRequest.Status),
+            "credit_refund_status": choices(CreditRefund.Status),
             "payment_status": choices(Order.PaymentStatus),
             "delivery_method": choices(Order.DeliveryMethod),
             "vendor_status": choices(Vendor.Status),
@@ -117,6 +118,8 @@ def site_config(request):
         },
         "exchange_rates": settings.EXCHANGE_RATES,
         "payment_simulation": settings.PAYMENT_MODE != "live",
+        # Bénéficiaire affiché avant de payer : le client paie toujours GuinéeMall, jamais la boutique
+        "payment_merchant": {"name": site.site_name, **settings.PAYMENT_MERCHANT},
         "referral_reward": settings.REFERRAL_REWARD_GNF,
         "affiliate_rate": settings.AFFILIATE_COMMISSION_RATE,
         "commission_rate": settings.PLATFORM_COMMISSION_RATE,

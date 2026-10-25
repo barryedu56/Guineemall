@@ -129,6 +129,12 @@ du statut directement auprès de l'opérateur.
 - **Paiement à la livraison** : celui qui livre encaisse. Si c'est la boutique, la commission est débitée de
   son portefeuille ; si c'est un livreur GuinéeMall, son portefeuille est débité des espèces encaissées et
   crédité de sa course.
+- **À qui paie le client ?** Toujours au compte marchand GuinéeMall (Orange Money, MTN ou carte), jamais à la
+  boutique : la page de l'opérateur affiche « GuinéeMall » comme bénéficiaire. La référence de la commande
+  accompagne le paiement, ce qui permet de la retrouver, puis de payer chaque boutique après la livraison.
+- **Avoir** : une commande payée puis annulée (par le client ou la boutique) est remboursée aussitôt en avoir.
+  L'avoir se déduit de la commande suivante, ou le client le demande sur son Mobile Money
+  (Back-office › Avoirs clients). Il n'est jamais rechargé par le client : ce n'est pas de la monnaie électronique.
 - Les retraits vers Orange Money ou MTN sont demandés dans le portefeuille et validés par un admin
   (Admin › Demandes de retrait › « Marquer comme payé »).
 
@@ -227,7 +233,7 @@ Toutes les routes sont préfixées par `/api/`. L'authentification se fait par J
 | Statuts | `statuts/` (fil groupé par boutique) · `statuts/<id>/view/` |
 | Social | `conversations/` (+ `start/`, `messages/`, `read/`, `typing/`) · `notifications/` · `auth/referral/` · `products/<slug>/reviews/` · `products/<slug>/share-image/` |
 | Promos et directs | `campaigns/` · `lives/` · `delivery/zones/` · `delivery/pickup-points/` · `config/` |
-| Portefeuille | `wallet/` · `wallet/payouts/` |
+| Portefeuille | `wallet/` · `wallet/payouts/` · `wallet/deposits/` · `wallet/credit/` (+ `cash-out/`) |
 | Vendeur | `vendor/shop/` · `vendor/products/` · `vendor/orders/` (+ `counts/`, `<id>/status/`, `<id>/riders/`, `<id>/assign/`, `<id>/withdraw/`) · `vendor/statuts/` · `vendor/coupons/` · `vendor/reviews/` · `vendor/lives/` · `vendor/stats/` · `vendor/verification/` |
 | Livreur | `auth/register/rider/` · `rider/profile/` · `rider/deliveries/` (+ `accept/`, `decline/`, `pickup/`, `deliver/`, `release/`, `location/`) · `delivery/<id>/messages/` |
 | Temps réel | `ws/?token=<jwt>` (messages, notifications, position du livreur) · `ws/live/<id>/` (commentaires d'un direct) |

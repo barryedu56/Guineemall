@@ -12,6 +12,7 @@ for prefix, viewset in [
     ("orders", views.OrderViewSet),
     ("payouts", views.PayoutViewSet),
     ("deposits", views.DepositViewSet),
+    ("credit-refunds", views.CreditRefundViewSet),
     ("categories", views.CategoryViewSet),
     ("products", views.ProductViewSet),
     ("reviews", views.ReviewViewSet),

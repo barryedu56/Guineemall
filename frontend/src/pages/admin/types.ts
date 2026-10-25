@@ -118,6 +118,20 @@ export interface AdminPayout {
   created_at: string
 }
 
+export interface AdminCreditRefund {
+  id: number
+  user: UserMini
+  amount: number
+  method_label: string
+  phone: string
+  status: string
+  status_label: string
+  transaction_reference: string
+  admin_note: string
+  credit_balance: number
+  created_at: string
+}
+
 export interface AdminDeposit {
   id: number
   user: UserMini

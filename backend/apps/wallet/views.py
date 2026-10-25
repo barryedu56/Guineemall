@@ -6,8 +6,15 @@ from rest_framework.response import Response
 
 from apps.orders.models import Order, VendorOrder
 
-from .models import LedgerEntry, PayoutRequest
-from .serializers import CashDepositSerializer, LedgerEntrySerializer, PayoutRequestSerializer
+from . import credit
+from .models import CreditEntry, LedgerEntry, PayoutRequest
+from .serializers import (
+    CashDepositSerializer,
+    CreditEntrySerializer,
+    CreditRefundSerializer,
+    LedgerEntrySerializer,
+    PayoutRequestSerializer,
+)
 from .services import declare_deposit, request_payout
 
 
@@ -83,3 +90,32 @@ class CashDepositViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewset
         except ValueError as e:
             raise ValidationError({"detail": str(e)})
         return Response(self.get_serializer(deposit).data, status=status.HTTP_201_CREATED)
+
+
+class CreditViewSet(viewsets.GenericViewSet):
+    """
+    GET /wallet/credit/ : avoir du client (solde, mouvements, demandes de remboursement)
+    POST /wallet/credit/cash-out/ {amount, method, phone} : se faire rendre l'avoir sur Mobile Money
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = CreditRefundSerializer
+    throttle_scope = None
+
+    def list(self, request):
+        user = request.user
+        return Response({
+            "balance": max(0, credit.balance(user)),
+            "entries": CreditEntrySerializer(CreditEntry.objects.filter(user=user)[:50], many=True).data,
+            "refunds": CreditRefundSerializer(user.credit_refunds.all()[:20], many=True).data,
+        })
+
+    @action(detail=False, methods=["post"], url_path="cash-out", throttle_scope="money")
+    def cash_out(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            refund = credit.request_cash_out(request.user, **serializer.validated_data)
+        except ValueError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(refund).data, status=status.HTTP_201_CREATED)

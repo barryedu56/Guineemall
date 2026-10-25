@@ -49,7 +49,10 @@ VENDOR_ORDER_TRANSITIONS = {
 }
 
 CANCELLABLE_VENDOR_STATUSES = [VendorOrder.Status.PENDING, VendorOrder.Status.CONFIRMED]
-ONLINE_METHODS = [Order.PaymentMethod.ORANGE_MONEY, Order.PaymentMethod.MTN_MOMO, Order.PaymentMethod.CARD]
+# Payées avant la livraison : argent en séquestre, versé après confirmation de réception
+ONLINE_METHODS = [
+    Order.PaymentMethod.ORANGE_MONEY, Order.PaymentMethod.MTN_MOMO, Order.PaymentMethod.CARD, Order.PaymentMethod.STORE_CREDIT,
+]
 
 
 def new_delivery_code():
@@ -184,9 +187,11 @@ def build_quote(user, cart_lines, address=None, pickup_point=None, coupon_code="
 # ---------------------------------------------------------------- Passage de commande
 
 @transaction.atomic
-def checkout(user, payment_method, address=None, pickup_point=None, coupon_code="", affiliate_code="", delivery_name=""):
+def checkout(user, payment_method, address=None, pickup_point=None, coupon_code="", affiliate_code="", delivery_name="",
+             use_credit=False):
     """Transforme le panier en commande, découpée en une sous-commande par boutique."""
     from apps.accounts.models import User
+    from apps.wallet import credit as avoir
 
     cart = list(CartItem.objects.filter(user=user).select_related("product__vendor"))
     if not cart:
@@ -214,6 +219,16 @@ def checkout(user, payment_method, address=None, pickup_point=None, coupon_code=
 
     quote = build_quote(user, lines, address, pickup_point, coupon_code, strict_coupon=True)
 
+    credit = 0
+    if use_credit:
+        User.objects.select_for_update().get(pk=user.pk)  # l'avoir ne peut pas être dépensé deux fois
+        credit = min(max(0, avoir.balance(user)), quote.total)
+    paid_by_credit = credit > 0 and credit == quote.total
+    if paid_by_credit:
+        payment_method = Order.PaymentMethod.STORE_CREDIT
+    elif credit and payment_method == Order.PaymentMethod.CASH_ON_DELIVERY:
+        raise OrderError("Votre avoir ne couvre pas toute la commande : payez le reste en ligne (Orange Money, MTN ou carte).")
+
     affiliate = None
     if affiliate_code:
         affiliate = User.objects.filter(referral_code=affiliate_code.upper()).exclude(pk=user.pk).first()
@@ -225,6 +240,8 @@ def checkout(user, payment_method, address=None, pickup_point=None, coupon_code=
         delivery_fee=quote.delivery_fee,
         discount_amount=quote.discount,
         total_amount=quote.total,
+        credit_used=credit,
+        payment_status=Order.PaymentStatus.PAID if paid_by_credit else Order.PaymentStatus.PENDING,
         coupon=quote.coupon,
         affiliate=affiliate,
         payment_method=payment_method,
@@ -265,11 +282,15 @@ def checkout(user, payment_method, address=None, pickup_point=None, coupon_code=
         type(quote.coupon).objects.filter(pk=quote.coupon.pk).update(used_count=F("used_count") + 1)
 
     OrderStatusHistory.objects.create(order=order, status=order.status, changed_by=user, note="Commande passée")
+    if credit:
+        avoir.add_credit(user, -credit, avoir.CreditEntry.Kind.USED, order, f"Commande #{order.id}")
+        if paid_by_credit:
+            OrderStatusHistory.objects.create(order=order, status=order.status, note="Payée avec l'avoir")
     CartItem.objects.filter(user=user).delete()
 
-    # Paiement à la livraison : les boutiques sont prévenues tout de suite.
+    # Paiement à la livraison ou avec l'avoir : les boutiques sont prévenues tout de suite.
     # Paiement en ligne : seulement une fois le paiement reçu (voir mark_order_paid).
-    if payment_method == Order.PaymentMethod.CASH_ON_DELIVERY:
+    if payment_method in (Order.PaymentMethod.CASH_ON_DELIVERY, Order.PaymentMethod.STORE_CREDIT):
         announce_order(order)
     return order
 
@@ -288,9 +309,13 @@ def mark_order_paid(order):
     if order.payment_status == Order.PaymentStatus.PAID:
         return order
     if order.status == Order.Status.CANCELLED:
-        # Paiement arrivé après l'expiration de la commande : à rembourser
-        order.payment_status = Order.PaymentStatus.REFUND_PENDING
-        order.save(update_fields=["payment_status", "updated_at"])
+        # Paiement arrivé après l'expiration de la commande : remboursé en avoir
+        from apps.wallet.credit import refund_to_credit
+
+        refund_to_credit(order, order.amount_due, "paiement reçu après l'annulation")
+        order.refunded_amount += order.amount_due
+        order.payment_status = Order.PaymentStatus.REFUNDED
+        order.save(update_fields=["payment_status", "refunded_amount", "updated_at"])
         return order
     order.payment_status = Order.PaymentStatus.PAID
     order.save(update_fields=["payment_status", "updated_at"])
@@ -310,10 +335,26 @@ def _restore_stock(vendor_order):
         Product.objects.filter(pk=item.product_id).update(stock=F("stock") + item.quantity)
 
 
-def _flag_refund(order):
-    if order.payment_status == Order.PaymentStatus.PAID:
-        order.payment_status = Order.PaymentStatus.REFUND_PENDING
-        order.save(update_fields=["payment_status", "updated_at"])
+def _refund(order, vendor_orders, reason):
+    """
+    Parties annulées d'une commande déjà payée (en ligne ou avec l'avoir) : remboursées tout de suite en avoir.
+    Commande annulée avant paiement : l'avoir engagé est rendu.
+    """
+    from apps.wallet.credit import CreditEntry, add_credit, refund_to_credit
+
+    all_cancelled = not order.vendor_orders.exclude(status=VendorOrder.Status.CANCELLED).exists()
+    if order.payment_status == Order.PaymentStatus.PAID and order.payment_method != Order.PaymentMethod.CASH_ON_DELIVERY:
+        amount = sum(vo.total_amount for vo in vendor_orders)
+        refund_to_credit(order, amount, reason)
+        order.refunded_amount += amount
+        if all_cancelled:
+            order.payment_status = Order.PaymentStatus.REFUNDED
+        order.save(update_fields=["payment_status", "refunded_amount", "updated_at"])
+    elif order.payment_status in (Order.PaymentStatus.PENDING, Order.PaymentStatus.FAILED) and order.credit_used and all_cancelled \
+            and order.refunded_amount < order.credit_used:
+        add_credit(order.user, order.credit_used, CreditEntry.Kind.RESTORED, order, f"Commande #{order.id} annulée avant paiement")
+        order.refunded_amount = order.credit_used
+        order.save(update_fields=["refunded_amount", "updated_at"])
 
 
 def _sync_order_status(order, changed_by):
@@ -370,7 +411,7 @@ def cancel_order(order, user):
             notify(vendor_order.vendor.user, "order", f"Commande #{order.id} annulée",
                    "Le client a annulé sa commande.", f"/vendeur/commandes/{vendor_order.id}", whatsapp=False)
 
-    _flag_refund(order)
+    _refund(order, cancellable, "annulée à votre demande")
     _sync_order_status(order, user)
     return order
 
@@ -418,7 +459,7 @@ def update_vendor_order_status(vendor_order, new_status, user, code_checked=Fals
 
     if new_status == VendorOrder.Status.CANCELLED:
         _restore_stock(vendor_order)
-        _flag_refund(order)
+        _refund(order, [vendor_order], f"{vendor_order.vendor.shop_name} a annulé sa partie")
     if new_status == VendorOrder.Status.READY and home:
         # Course créée : c'est la boutique qui choisit ensuite son livreur (ou livre elle-même)
         Delivery.objects.get_or_create(vendor_order=vendor_order, defaults={"fee": vendor_order.delivery_fee})
@@ -493,6 +534,7 @@ def expire_unpaid_order(order):
         _restore_stock(vendor_order)
     order.payment_status = Order.PaymentStatus.FAILED
     order.save(update_fields=["payment_status", "updated_at"])
+    _refund(order, [], "")  # rend l'avoir engagé, s'il y en a
     OrderStatusHistory.objects.create(order=order, status=Order.Status.CANCELLED, note="Paiement non reçu à temps")
     _sync_order_status(order, None)
     return True

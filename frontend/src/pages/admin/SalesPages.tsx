@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Banknote, KeyRound, Package, Wallet } from 'lucide-react'
+import { Banknote, KeyRound, Package, RotateCcw, Wallet } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import Price from '../../components/Price'
@@ -9,7 +9,7 @@ import { api, formatDate, formatPhone } from '../../lib/api'
 import { BO, useAdminAction, useAdminList } from './hooks'
 import { ListView, Toolbar } from './kit'
 import { useAsk } from './useAsk'
-import type { AdminDeposit, AdminOrder, AdminPayout } from './types'
+import type { AdminCreditRefund, AdminDeposit, AdminOrder, AdminPayout } from './types'
 
 export function AdminOrders() {
   const { data: config } = useSiteConfig()
@@ -163,6 +163,46 @@ export function AdminPayouts() {
           { label: 'Statut', render: (p) => <><StatusBadge status={p.status === 'paid' ? 'delivered' : p.status === 'rejected' ? 'cancelled' : 'pending'} label={p.status_label} />{p.transaction_reference && <p className="text-xs text-ink/50">réf. {p.transaction_reference}</p>}</> },
           { label: 'Actions', render: (p) => p.status === 'pending' && (
             <div className="flex gap-2"><Button size="sm" onClick={() => pay(p)}>Payé</Button><Button size="sm" variant="ghost" onClick={() => reject(p)}>Refuser</Button></div>
+          ) },
+        ]}
+      />
+    </>
+  )
+}
+
+export function AdminCreditRefunds() {
+  const { data: config } = useSiteConfig()
+  const query = useAdminList<AdminCreditRefund>('credit-refunds', ['status', 'method'])
+  const action = useAdminAction('credit-refunds')
+  const [ask, dialog] = useAsk()
+
+  async function pay(r: AdminCreditRefund) {
+    const reference = await ask({ title: `Rembourser ${r.user.name}`, label: `Après l'envoi de l'argent (${r.method_label} ${formatPhone(r.phone)}), saisissez la référence du transfert`, confirm: 'Remboursement envoyé', required: true })
+    if (reference) action.mutate({ id: r.id, action: 'pay', body: { reference }, success: 'Remboursement enregistré, client prévenu' })
+  }
+  async function reject(r: AdminCreditRefund) {
+    const note = await ask({ title: `Refuser la demande de ${r.user.name}`, label: "Motif (envoyé au client, son avoir lui est rendu)", confirm: 'Refuser', danger: true, required: true })
+    if (note) action.mutate({ id: r.id, action: 'reject', body: { note }, success: 'Demande refusée, avoir rendu' })
+  }
+
+  return (
+    <>
+      {dialog}
+      <PageHeader title="Avoirs clients" subtitle="Clients qui demandent leur avoir (commandes remboursées) sur Orange Money ou MTN. Le montant est déjà réservé sur leur avoir." />
+      <Toolbar searchPlaceholder="Nom, email, numéro, référence" filters={[{ key: 'status', label: 'Statut', options: config?.choices.credit_refund_status ?? [] }]} />
+      <ListView
+        query={query}
+        emptyIcon={<RotateCcw />}
+        emptyTitle="Aucune demande"
+        columns={[
+          { label: 'Date', render: (r) => formatDate(r.created_at) },
+          { label: 'Client', render: (r) => <><p className="font-medium">{r.user.name}</p><p className="text-xs text-ink/50">{r.user.email}</p></> },
+          { label: 'Montant', render: (r) => <Price amount={r.amount} className="font-bold" /> },
+          { label: 'Vers', render: (r) => <>{r.method_label}<p className="text-xs text-ink/50">{formatPhone(r.phone)}</p></> },
+          { label: 'Avoir restant', render: (r) => <Price amount={r.credit_balance} className="text-ink/60" /> },
+          { label: 'Statut', render: (r) => <><StatusBadge status={r.status === 'paid' ? 'delivered' : r.status === 'rejected' ? 'cancelled' : 'pending'} label={r.status_label} />{r.transaction_reference && <p className="text-xs text-ink/50">réf. {r.transaction_reference}</p>}</> },
+          { label: 'Actions', render: (r) => r.status === 'pending' && (
+            <div className="flex gap-2"><Button size="sm" onClick={() => pay(r)}>Remboursé</Button><Button size="sm" variant="ghost" onClick={() => reject(r)}>Refuser</Button></div>
           ) },
         ]}
       />

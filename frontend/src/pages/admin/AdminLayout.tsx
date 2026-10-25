@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  BadgeCheck, Banknote, Bike, FolderTree, LayoutDashboard, MessageSquareQuote, Package, Radio, ScrollText, Settings,
+  BadgeCheck, Banknote, Bike, FolderTree, LayoutDashboard, MessageSquareQuote, Package, Radio, RotateCcw, ScrollText, Settings,
   ShoppingBag, Store, Tag, Truck, Users, Wallet,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -20,6 +20,7 @@ const SECTIONS: { title: string; links: { to: string; label: string; icon: typeo
       { to: '/administration/commandes', label: 'Commandes', icon: ShoppingBag, todo: 'refunds_pending' },
       { to: '/administration/retraits', label: 'Retraits', icon: Wallet, todo: 'payouts_pending' },
       { to: '/administration/versements', label: "Versements d'espèces", icon: Banknote, todo: 'deposits_pending' },
+      { to: '/administration/avoirs', label: 'Avoirs clients', icon: RotateCcw, todo: 'credit_refunds_pending' },
     ],
   },
   {

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from apps.core.permissions import IsVendeur, get_vendor
 
 from apps.payments.providers import PaymentError
+from apps.wallet.models import CreditEntry
 from apps.payments.services import start_payment
 
 from . import services
@@ -121,6 +122,7 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
             "delivery_delay": quote.delivery_delay,
             "coupon": quote.coupon.code if quote.coupon else None,
             "coupon_error": quote.coupon_error,
+            "credit_available": max(0, CreditEntry.balance(request.user)),
             "shops": [
                 {"shop_name": v.vendor.shop_name, "subtotal": v.subtotal, "delivery_fee": v.delivery_fee}
                 for v in quote.vendors

@@ -19,7 +19,8 @@ from apps.delivery.models import Delivery, DeliveryZone, PickupPoint, Rider
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Campaign, Coupon
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import CashDeposit, PayoutRequest
+from apps.wallet.credit import process_cash_out
+from apps.wallet.models import CashDeposit, CreditRefund, PayoutRequest
 from apps.wallet.services import process_deposit, process_payout
 
 from . import serializers as s
@@ -253,6 +254,27 @@ class DepositViewSet(mixins.ListModelMixin, AdminViewSet):
     def reject(self, request, pk=None):
         deposit = process_deposit(self.get_object(), request.user, confirmed=False, note=text(request, "note", required=True))
         return Response(self.get_serializer(deposit).data)
+
+
+class CreditRefundViewSet(mixins.ListModelMixin, AdminViewSet):
+    """Avoirs que les clients demandent à recevoir sur Orange Money / MTN."""
+
+    serializer_class = s.AdminCreditRefundSerializer
+    filterset_fields = ["status", "method"]
+    search_fields = ["user__name", "user__email", "phone", "transaction_reference"]
+
+    def get_queryset(self):
+        return CreditRefund.objects.select_related("user").order_by("status", "-created_at")
+
+    @action(detail=True, methods=["post"])
+    def pay(self, request, pk=None):
+        refund = process_cash_out(self.get_object(), request.user, paid=True, reference=text(request, "reference", required=True))
+        return Response(self.get_serializer(refund).data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        refund = process_cash_out(self.get_object(), request.user, paid=False, note=text(request, "note", required=True))
+        return Response(self.get_serializer(refund).data)
 
 
 # ---------------------------------------------------------------- Catalogue

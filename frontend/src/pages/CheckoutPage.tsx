@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Banknote, CreditCard, Gift, MapPin, ShieldCheck, Smartphone, Store, Tag } from 'lucide-react'
+import { Banknote, CreditCard, Gift, MapPin, Smartphone, Store, Tag, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 
 import AddressForm from '../components/AddressForm'
+import PaymentInfo from '../components/PaymentInfo'
 import Price from '../components/Price'
 import { Button, ErrorBox, Input, PhoneInput, Spinner } from '../components/ui'
 import { useAuth } from '../context/auth'
@@ -20,6 +21,7 @@ const PAYMENT_ICONS: Record<PaymentMethod, typeof Banknote> = {
   mtn_momo: Smartphone,
   cash_on_delivery: Banknote,
   card: CreditCard,
+  store_credit: Wallet,
 }
 
 export default function CheckoutPage() {
@@ -38,6 +40,7 @@ export default function CheckoutPage() {
   const [payerPhone, setPayerPhone] = useState(user?.phone ?? '')
   const [couponInput, setCouponInput] = useState('')
   const [coupon, setCoupon] = useState('')
+  const [useCredit, setUseCredit] = useState(true)
   const [gift, setGift] = useState(false)
   const [recipient, setRecipient] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -64,12 +67,26 @@ export default function CheckoutPage() {
     retry: false,
   })
 
+  // Avoir : déduit du total ; s'il ne couvre pas tout, le reste se paie en ligne (pas en espèces)
+  const onlineMethods = config?.payment_methods.filter((m) => m.value !== 'cash_on_delivery') ?? []
+  const available = quote?.credit_available ?? 0
+  const creditUsable = available > 0 && (available >= (quote?.total ?? 0) || onlineMethods.length > 0)
+  const creditUsed = useCredit && creditUsable && quote ? Math.min(available, quote.total) : 0
+  const fullyCovered = !!quote && creditUsed > 0 && creditUsed === quote.total
+  const toPay = (quote?.total ?? 0) - creditUsed
+  const effectivePayment: PaymentMethod = fullyCovered
+    ? 'store_credit'
+    : creditUsed > 0 && payment === 'cash_on_delivery'
+      ? onlineMethods[0].value
+      : payment
+
   const placeOrder = useMutation({
     mutationFn: async () => {
       const order = (
         await api.post<Order>('/orders/', {
           ...place,
-          payment_method: payment,
+          payment_method: fullyCovered ? (config?.payment_methods[0]?.value ?? payment) : effectivePayment,
+          use_credit: creditUsed > 0,
           coupon_code: quote?.coupon ?? '',
           affiliate_code: affiliateCode(),
           delivery_name: gift ? recipient : '',
@@ -80,7 +97,7 @@ export default function CheckoutPage() {
     onSuccess: async (order) => {
       queryClient.invalidateQueries({ queryKey: ['cart'] })
       queryClient.invalidateQueries({ queryKey: ['orders'] })
-      if (payment === 'cash_on_delivery') {
+      if (order.payment_method === 'cash_on_delivery' || order.payment_method === 'store_credit') {
         navigate(`/commandes/${order.id}?nouvelle=1`, { replace: true })
         return
       }
@@ -181,32 +198,46 @@ export default function CheckoutPage() {
 
         <section className="card p-6">
           <h2 className="mb-3 text-lg font-semibold">Paiement</h2>
-          <div className="space-y-2">
-            {config?.payment_methods.map(({ value, label, description }) => {
-              const Icon = PAYMENT_ICONS[value]
-              return (
-                <label key={value} className={`${radio(payment === value)} items-center`}>
-                  <input type="radio" checked={payment === value} onChange={() => setPayment(value)} className="accent-primary-dark" />
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-background"><Icon className="size-5 text-ink/70" /></span>
-                  <span>
-                    <span className="block font-semibold">{label}</span>
-                    <span className="block text-sm text-ink/60">{description}</span>
-                  </span>
-                </label>
-              )
-            })}
-          </div>
-          {payment === 'mtn_momo' && (
-            <div className="mt-3">
-              <PhoneInput label="Numéro MTN qui paie" value={payerPhone} onValueChange={setPayerPhone} required />
-            </div>
+          {creditUsable && (
+            <label className={`${radio(useCredit)} mb-3 items-center`}>
+              <input type="checkbox" checked={useCredit} onChange={(e) => setUseCredit(e.target.checked)} className="size-4 accent-primary-dark" />
+              <span className="flex size-10 items-center justify-center rounded-xl bg-background"><Wallet className="size-5 text-ink/70" /></span>
+              <span>
+                <span className="block font-semibold">Utiliser mon avoir {config?.site.name}</span>
+                <span className="block text-sm text-ink/60"><Price amount={available} /> disponibles (commandes remboursées)</span>
+              </span>
+            </label>
           )}
-          {payment !== 'cash_on_delivery' && (
-            <p className="mt-3 flex gap-2 rounded-xl bg-green-50 p-3 text-sm text-green-800">
-              <ShieldCheck className="size-5 shrink-0" />
-              Paiement protégé : la boutique n'est payée qu'après votre confirmation de réception
-              {config ? ` (ou automatiquement ${config.escrow_days} jours après la livraison)` : ''}.
-            </p>
+          {fullyCovered ? (
+            <p className="rounded-xl bg-green-50 p-3 text-sm font-medium text-green-800">Votre avoir couvre toute la commande : rien d'autre à payer.</p>
+          ) : (
+            <>
+              {creditUsed > 0 && <p className="mb-2 text-sm text-ink/70">Reste à payer : <Price amount={toPay} className="font-bold" /></p>}
+              <div className="space-y-2">
+                {config?.payment_methods.map(({ value, label, description }) => {
+                  const Icon = PAYMENT_ICONS[value]
+                  const disabled = creditUsed > 0 && value === 'cash_on_delivery'
+                  return (
+                    <label key={value} className={`${radio(effectivePayment === value)} items-center ${disabled ? 'pointer-events-none opacity-50' : ''}`}>
+                      <input type="radio" checked={effectivePayment === value} disabled={disabled} onChange={() => setPayment(value)} className="accent-primary-dark" />
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-background"><Icon className="size-5 text-ink/70" /></span>
+                      <span>
+                        <span className="block font-semibold">{label}</span>
+                        <span className="block text-sm text-ink/60">{disabled ? "Pas avec l'avoir : payez le reste en ligne" : description}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+              {effectivePayment === 'mtn_momo' && (
+                <div className="mt-3">
+                  <PhoneInput label="Numéro MTN qui paie" value={payerPhone} onValueChange={setPayerPhone} required />
+                </div>
+              )}
+              <div className="mt-3">
+                <PaymentInfo method={effectivePayment} amount={quote ? toPay : undefined} />
+              </div>
+            </>
           )}
         </section>
       </div>
@@ -254,6 +285,12 @@ export default function CheckoutPage() {
               <div className="flex justify-between text-green-700"><dt>Réduction</dt><dd>-<Price amount={quote.discount} /></dd></div>
             )}
             <div className="flex justify-between pt-2 text-lg font-bold"><dt>Total</dt><dd><Price amount={quote.total} /></dd></div>
+            {creditUsed > 0 && (
+              <>
+                <div className="flex justify-between text-green-700"><dt>Avoir utilisé</dt><dd>-<Price amount={creditUsed} /></dd></div>
+                <div className="flex justify-between font-bold"><dt>À payer</dt><dd><Price amount={toPay} /></dd></div>
+              </>
+            )}
             <p className="text-xs text-ink/60">Délai indicatif : {quote.delivery_delay}</p>
           </dl>
         ) : quoteError ? (
@@ -265,14 +302,14 @@ export default function CheckoutPage() {
         <ErrorBox message={error} />
         <Button
           className="w-full"
-          disabled={!quote || (gift && !recipient.trim()) || (payment === 'mtn_momo' && !payerPhone.trim())}
+          disabled={!quote || (gift && !recipient.trim()) || (effectivePayment === 'mtn_momo' && !payerPhone.trim())}
           loading={placeOrder.isPending}
           onClick={() => {
             setError(null)
             placeOrder.mutate()
           }}
         >
-          {payment === 'cash_on_delivery' ? 'Confirmer la commande' : 'Commander et payer'}
+          {effectivePayment === 'cash_on_delivery' || fullyCovered ? 'Confirmer la commande' : <>Payer <Price amount={toPay} /></>}
         </Button>
       </aside>
     </div>

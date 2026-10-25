@@ -30,7 +30,8 @@ export default function PaymentSimulationPage() {
         <Price amount={payment.amount} className="mt-1 block text-3xl font-extrabold" />
       </div>
       <p className="text-sm text-ink/70">
-        Mode développement : aucun argent n'est débité. En production, cette page est celle de l'opérateur.
+        Mode essai : aucun argent n'est débité. En réel, c'est la page de l'opérateur, où le bénéficiaire affiché est le compte
+        marchand de la plateforme ; la boutique est payée ensuite par la plateforme.
       </p>
       <div className="grid gap-2">
         <Button loading={decide.isPending && decide.variables === 'success'} onClick={() => decide.mutate('success')}>

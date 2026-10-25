@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Lock, Wallet as WalletIcon } from 'lucide-react'
+import { Lock, RotateCcw, Wallet as WalletIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import Price from '../components/Price'
@@ -8,7 +8,7 @@ import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
 import { useToast } from '../context/toast'
 import { api, errorMessage, formatDate, formatPhone } from '../lib/api'
-import type { CashDeposit, Payout, Wallet } from '../lib/types'
+import type { CashDeposit, Payout, StoreCredit, Wallet } from '../lib/types'
 
 /** Portefeuille : vendeurs (ventes), ambassadeurs (commissions), livreurs (courses). */
 export default function WalletPage() {
@@ -47,6 +47,7 @@ export default function WalletPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <StoreCreditSection />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-3xl bg-ink p-6 text-white">
           <p className="flex items-center gap-2 text-white/70"><WalletIcon className="size-5" /> Solde disponible</p>
@@ -172,6 +173,91 @@ function DepositForm({ debt }: { debt: number }) {
           ))}
         </ul>
       )}
+    </section>
+  )
+}
+
+/** Avoir du client (commandes remboursées) : dépensé à la commande ou rendu sur Mobile Money. */
+function StoreCreditSection() {
+  const { user } = useAuth()
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const { data: config } = useSiteConfig()
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ amount: '', method: '', phone: user?.phone ?? '' })
+  const method = form.method || config?.choices.payout_method[0]?.value || ''
+  const { data: credit } = useQuery({
+    queryKey: ['store-credit'],
+    queryFn: async () => (await api.get<StoreCredit>('/wallet/credit/')).data,
+  })
+  const cashOut = useMutation({
+    mutationFn: () => api.post('/wallet/credit/cash-out/', { ...form, method, amount: Number(form.amount) }),
+    onSuccess: () => {
+      toast("Demande envoyée : l'équipe vous envoie l'argent")
+      setOpen(false)
+      setForm({ ...form, amount: '' })
+      queryClient.invalidateQueries({ queryKey: ['store-credit'] })
+    },
+    onError: (e) => toast(errorMessage(e), 'error'),
+  })
+  if (!credit || (credit.balance === 0 && credit.entries.length === 0)) return null
+
+  return (
+    <section className="card space-y-4 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="flex items-center gap-2 text-ink/60"><RotateCcw className="size-5" /> Mon avoir {config?.site.name}</p>
+          <Price amount={credit.balance} className="mt-1 block text-3xl font-extrabold" />
+          <p className="text-sm text-ink/60">Argent de vos commandes annulées. Il se déduit automatiquement de votre prochaine commande.</p>
+        </div>
+        {credit.balance > 0 && !open && (
+          <Button variant="outline" onClick={() => { setForm({ ...form, amount: String(credit.balance) }); setOpen(true) }}>
+            Le recevoir sur mon Mobile Money
+          </Button>
+        )}
+      </div>
+      {open && (
+        <form onSubmit={(e) => { e.preventDefault(); cashOut.mutate() }} className="grid gap-3 rounded-2xl bg-background p-4 sm:grid-cols-3">
+          <AmountInput label="Montant (GNF)" value={form.amount} onValueChange={(amount) => setForm({ ...form, amount })} required />
+          <Select label="Vers" value={method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
+            {config?.choices.payout_method.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </Select>
+          <PhoneInput label="Numéro" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
+          <div className="flex gap-2 sm:col-span-3">
+            <Button type="submit" loading={cashOut.isPending}>Demander le remboursement</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
+          </div>
+        </form>
+      )}
+      {credit.refunds.length > 0 && (
+        <ul className="divide-y divide-ink/5 text-sm">
+          {credit.refunds.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-2 py-2">
+              <span>{formatDate(r.created_at)} · {r.method_label} {formatPhone(r.phone)}{r.admin_note && ` · ${r.admin_note}`}</span>
+              <span className="flex items-center gap-2">
+                <Price amount={r.amount} />
+                <Badge tone={r.status === 'paid' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'}>{r.status_label}</Badge>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <details className="text-sm">
+        <summary className="cursor-pointer font-semibold">Historique de l'avoir</summary>
+        <ul className="mt-2 divide-y divide-ink/5">
+          {credit.entries.map((e) => (
+            <li key={e.id} className="flex items-center justify-between gap-2 py-2">
+              <span>
+                <span className="block font-medium">{e.kind_label}</span>
+                <span className="text-ink/60">{e.note} · {formatDate(e.created_at)}</span>
+              </span>
+              <span className={`shrink-0 font-semibold ${e.amount < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                {e.amount > 0 ? '+' : '-'}<Price amount={Math.abs(e.amount)} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   )
 }

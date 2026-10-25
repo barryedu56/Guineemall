@@ -70,8 +70,10 @@ class OnlinePaymentTests(OrderTestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("pas encore configuré", r.data["detail"])
 
-    def test_annulation_apres_paiement_signale_un_remboursement(self):
+    def test_annulation_apres_paiement_remboursee_en_avoir(self):
         ref = self.pay().data["reference"]
         self.client.post(f"/api/payments/simulation/{ref}/", {"result": "success"})
         self.client.post(f"/api/orders/{self.order_id}/cancel/")
-        self.assertEqual(Order.objects.get(pk=self.order_id).payment_status, "refund_pending")
+        order = Order.objects.get(pk=self.order_id)
+        self.assertEqual((order.payment_status, order.refunded_amount), ("refunded", order.total_amount))
+        self.assertEqual(self.client.get("/api/wallet/credit/").data["balance"], order.total_amount)

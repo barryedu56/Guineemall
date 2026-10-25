@@ -117,3 +117,64 @@ class CashDeposit(TimeStampedModel):
 
     def __str__(self):
         return f"Versement {gnf(self.amount)} – {self.user}"
+
+
+class CreditEntry(models.Model):
+    """
+    Avoir du client : uniquement alimenté par des remboursements (jamais rechargé par le client,
+    ce n'est donc pas de la monnaie électronique). Le solde est la somme des montants.
+    """
+
+    class Kind(models.TextChoices):
+        REFUND = "refund", "Remboursement d'une commande"
+        USED = "used", "Utilisé pour une commande"
+        RESTORED = "restored", "Rendu (commande non payée)"
+        CASH_OUT = "cash_out", "Remboursé sur Mobile Money"
+        CASH_OUT_CANCELLED = "cash_out_cancelled", "Remboursement Mobile Money refusé"
+        ADJUSTMENT = "adjustment", "Geste commercial / ajustement"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="credit_entries")
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    amount = models.BigIntegerField("montant (GNF)")
+    order = models.ForeignKey("orders.Order", on_delete=models.SET_NULL, null=True, blank=True, related_name="credit_entries")
+    refund = models.ForeignKey("CreditRefund", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    note = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "mouvement d'avoir"
+        verbose_name_plural = "mouvements d'avoir"
+        ordering = ["-created_at"]
+
+    @staticmethod
+    def balance(user):
+        return CreditEntry.objects.filter(user=user).aggregate(total=Sum("amount"))["total"] or 0
+
+
+class CreditRefund(TimeStampedModel):
+    """Le client demande que son avoir lui soit rendu sur Orange Money / MTN ; un admin envoie l'argent."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En attente"
+        PAID = "paid", "Remboursé"
+        REJECTED = "rejected", "Refusé"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="credit_refunds")
+    amount = models.PositiveBigIntegerField("montant (GNF)")
+    method = models.CharField(max_length=20, choices=PayoutRequest.Method.choices)
+    phone = PhoneField("numéro")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    transaction_reference = models.CharField("référence du transfert", max_length=100, blank=True)
+    admin_note = models.CharField(max_length=255, blank=True)
+    processed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "remboursement d'avoir"
+        verbose_name_plural = "remboursements d'avoir"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Remboursement {gnf(self.amount)} – {self.user}"

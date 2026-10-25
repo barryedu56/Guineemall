@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import CashDeposit, LedgerEntry, PayoutRequest
+from .models import CashDeposit, CreditEntry, CreditRefund, LedgerEntry, PayoutRequest
 
 
 class LedgerEntrySerializer(serializers.ModelSerializer):
@@ -28,3 +28,21 @@ class CashDepositSerializer(serializers.ModelSerializer):
         model = CashDeposit
         fields = ["id", "amount", "method", "method_label", "reference", "status", "status_label", "admin_note", "created_at"]
         read_only_fields = ["status", "admin_note"]
+
+
+class CreditEntrySerializer(serializers.ModelSerializer):
+    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+
+    class Meta:
+        model = CreditEntry
+        fields = ["id", "kind", "kind_label", "amount", "order", "note", "created_at"]
+
+
+class CreditRefundSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    method_label = serializers.CharField(source="get_method_display", read_only=True)
+
+    class Meta:
+        model = CreditRefund
+        fields = ["id", "amount", "method", "method_label", "phone", "status", "status_label", "admin_note", "created_at", "processed_at"]
+        read_only_fields = ["status", "admin_note", "processed_at"]

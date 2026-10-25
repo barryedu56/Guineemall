@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { ContactButtons, Timeline } from '../components/Delivery'
+import PaymentInfo from '../components/PaymentInfo'
 import Price from '../components/Price'
 import { StarInput } from '../components/Stars'
 import { Button, Empty, ErrorBox, PageHeader, Pager, PhoneInput, Spinner, StatusBadge } from '../components/ui'
@@ -164,11 +165,12 @@ export function OrderDetailPage() {
             Paiement {order.payment_method_label} en attente
             {config ? ` – la commande sera annulée si elle n'est pas payée sous ${config.unpaid_timeout_minutes} minutes.` : '.'}
           </p>
+          <PaymentInfo method={order.payment_method} amount={order.amount_due} />
           {order.payment_method === 'mtn_momo' && (
             <PhoneInput label="Numéro MTN qui paie" value={phone} onValueChange={setPhone} />
           )}
           <Button loading={action.isPending && action.variables === 'pay'} onClick={() => action.mutate('pay')}>
-            Payer <Price amount={order.total_amount} />
+            Payer <Price amount={order.amount_due} />
           </Button>
         </section>
       )}
@@ -265,7 +267,15 @@ export function OrderDetailPage() {
             <div className="flex justify-between text-green-700"><dt>Réduction {order.coupon_code}</dt><dd>-<Price amount={order.discount_amount} /></dd></div>
           )}
           <div className="flex justify-between pt-1 text-lg font-bold"><dt>Total</dt><dd><Price amount={order.total_amount} /></dd></div>
+          {order.credit_used > 0 && order.payment_method !== 'store_credit' && (
+            <div className="flex justify-between text-green-700"><dt>Payé avec l'avoir</dt><dd><Price amount={order.credit_used} /></dd></div>
+          )}
           <p className="text-ink/60">{order.payment_status_label}</p>
+          {order.refunded_amount > 0 && (
+            <Link to="/portefeuille" className="block font-medium text-green-700 hover:underline">
+              <Price amount={order.refunded_amount} /> remboursés sur votre avoir →
+            </Link>
+          )}
         </dl>
       </section>
 

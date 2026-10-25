@@ -127,3 +127,69 @@ class PayoutTests(OrderTestCase):
         process_payout(payout, admin, paid=True, reference="OM123")
         process_payout(payout, admin, paid=True)  # double clic : sans effet
         self.assertEqual(balance(self.kipe.user), 40_000)
+
+
+@override_settings(PAYMENT_MODE="simulation")
+class StoreCreditTests(OrderTestCase):
+    """Avoir : alimenté par les remboursements, dépensé à la commande, rendu sur Mobile Money à la demande."""
+
+    def give_credit(self, amount):
+        from .models import CreditEntry
+
+        CreditEntry.objects.create(user=self.user, kind="refund", amount=amount)
+
+    def credit(self):
+        return self.client.get("/api/wallet/credit/").data["balance"]
+
+    def test_avoir_couvre_toute_la_commande(self):
+        self.give_credit(1_000_000)
+        self.add(self.riz, 1)  # 350 000 + 20 000
+        self.assertEqual(self.client.post("/api/orders/quote/", {"address": self.address.pk}).data["credit_available"], 1_000_000)
+        r = self.checkout("orange_money", use_credit=True)
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual((r.data["payment_method"], r.data["payment_status"], r.data["amount_due"]), ("store_credit", "paid", 0))
+        self.assertEqual(self.credit(), 1_000_000 - 370_000)
+        # La boutique la voit tout de suite, comme une commande payée en ligne (séquestre)
+        self.client.force_authenticate(self.madina.user)
+        self.assertEqual(self.client.get("/api/vendor/orders/").data["count"], 1)
+
+    def test_avoir_partiel_complete_en_ligne(self):
+        from apps.payments.models import Payment
+
+        self.give_credit(100_000)
+        self.add(self.riz, 1)
+        self.assertEqual(self.checkout("cash_on_delivery", use_credit=True).status_code, 400)  # pas avec les espèces
+        r = self.checkout("orange_money", use_credit=True)
+        self.assertEqual((r.data["credit_used"], r.data["amount_due"]), (100_000, 270_000))
+        self.client.post(f"/api/orders/{r.data['id']}/pay/")
+        self.assertEqual(Payment.objects.get().amount, 270_000)
+        # Commande abandonnée avant paiement : l'avoir est rendu
+        self.client.post(f"/api/orders/{r.data['id']}/cancel/")
+        self.assertEqual(self.credit(), 100_000)
+
+    def test_annulation_par_la_boutique_remboursee_en_avoir(self):
+        self.give_credit(2_000_000)
+        self.add(self.riz, 1)
+        self.add(self.tel, 1)
+        order = self.checkout("orange_money", use_credit=True).data  # entièrement payée avec l'avoir
+        vo = VendorOrder.objects.get(order_id=order["id"], vendor=self.madina)
+        self.client.force_authenticate(self.madina.user)
+        self.client.post(f"/api/vendor/orders/{vo.pk}/status/", {"status": "cancelled"})
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.credit(), 2_000_000 - order["total_amount"] + vo.total_amount)
+        data = self.client.get(f"/api/orders/{order['id']}/").data
+        self.assertEqual((data["payment_status"], data["refunded_amount"]), ("paid", vo.total_amount))  # l'autre partie continue
+
+    def test_avoir_rendu_sur_mobile_money(self):
+        from .credit import process_cash_out
+        from .models import CreditRefund
+
+        self.give_credit(50_000)
+        r = self.client.post("/api/wallet/credit/cash-out/", {"amount": 80_000, "method": "orange_money", "phone": "620000001"})
+        self.assertEqual(r.status_code, 400)
+        r = self.client.post("/api/wallet/credit/cash-out/", {"amount": 50_000, "method": "orange_money", "phone": "620000001"})
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(self.credit(), 0)  # réservé aussitôt
+        admin = User.objects.create_superuser(email="adm@test.gn", password="x", name="Adm")
+        process_cash_out(CreditRefund.objects.get(), admin, paid=False, note="Numéro invalide")
+        self.assertEqual(self.credit(), 50_000)  # refusé : avoir rendu

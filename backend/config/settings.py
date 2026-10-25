@@ -220,6 +220,11 @@ DELIVERY_OFFER_MINUTES = 10
 
 # Paiements : "simulation" en développement, "live" avec les vraies clés
 PAYMENT_MODE = env("PAYMENT_MODE", default="simulation")
+# Compte marchand qui reçoit les paiements, affiché au client avant de payer (nom ou numéro marchand)
+PAYMENT_MERCHANT = {
+    "orange_money": env("ORANGE_MONEY_MERCHANT_DISPLAY", default=""),
+    "mtn_momo": env("MTN_MOMO_MERCHANT_DISPLAY", default=""),
+}
 ORANGE_MONEY = {
     "CLIENT_ID": env("ORANGE_MONEY_CLIENT_ID", default=""),
     "CLIENT_SECRET": env("ORANGE_MONEY_CLIENT_SECRET", default=""),

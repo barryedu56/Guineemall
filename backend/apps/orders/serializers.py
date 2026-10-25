@@ -7,6 +7,7 @@ from apps.catalog.models import Product
 from apps.catalog.serializers import ProductListSerializer
 
 from .models import CartItem, Order, OrderItem, OrderStatusHistory, VendorOrder
+from . import services
 from .services import VENDOR_ORDER_TRANSITIONS
 from .timeline import vendor_order_timeline
 
@@ -60,6 +61,7 @@ class CheckoutSerializer(QuoteSerializer):
     payment_method = serializers.ChoiceField(choices=Order.PaymentMethod.choices)
     affiliate_code = serializers.CharField(required=False, allow_blank=True, max_length=12)
     delivery_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    use_credit = serializers.BooleanField(required=False, default=False)
 
     def validate_payment_method(self, method):
         from apps.core.models import SiteSettings
@@ -156,12 +158,14 @@ class OrderSerializer(serializers.ModelSerializer):
     coupon_code = serializers.CharField(source="coupon.code", read_only=True, default=None)
     pickup_point_name = serializers.CharField(source="pickup_point.name", read_only=True, default=None)
     awaiting_payment = serializers.SerializerMethodField()
+    amount_due = serializers.IntegerField(read_only=True)
     can_confirm_reception = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
-            "id", "subtotal", "delivery_fee", "discount_amount", "total_amount", "coupon_code",
+            "id", "subtotal", "delivery_fee", "discount_amount", "total_amount", "credit_used", "amount_due",
+            "refunded_amount", "coupon_code",
             "status", "status_label", "payment_method", "payment_method_label", "payment_status", "payment_status_label",
             "awaiting_payment", "can_confirm_reception", "delivery_method", "pickup_point_name",
             "delivery_name", *DELIVERY_FIELDS, "vendor_orders", "status_history", "created_at",
@@ -175,7 +179,7 @@ class OrderSerializer(serializers.ModelSerializer):
         )
 
     def get_can_confirm_reception(self, order):
-        return order.payment_method != Order.PaymentMethod.CASH_ON_DELIVERY and any(
+        return order.payment_method in services.ONLINE_METHODS and any(
             vo.status == VendorOrder.Status.DELIVERED and vo.received_at is None for vo in order.vendor_orders.all()
         )
 

@@ -51,6 +51,7 @@ class Order(TimeStampedModel, SoftDeleteModel):
         ORANGE_MONEY = "orange_money", "Orange Money"
         MTN_MOMO = "mtn_momo", "MTN Mobile Money"
         CARD = "card", "Carte bancaire"
+        STORE_CREDIT = "store_credit", "Avoir GuinéeMall"
 
     class PaymentStatus(models.TextChoices):
         PENDING = "pending", "En attente"
@@ -68,6 +69,8 @@ class Order(TimeStampedModel, SoftDeleteModel):
     delivery_fee = models.PositiveBigIntegerField("frais de livraison (GNF)", default=0)
     discount_amount = models.PositiveBigIntegerField("réduction (GNF)", default=0)
     total_amount = models.PositiveBigIntegerField("total (GNF)")
+    credit_used = models.PositiveBigIntegerField("payé avec l'avoir (GNF)", default=0)
+    refunded_amount = models.PositiveBigIntegerField("remboursé en avoir (GNF)", default=0)
     coupon = models.ForeignKey("promotions.Coupon", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     affiliate = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="affiliated_orders",
@@ -105,6 +108,11 @@ class Order(TimeStampedModel, SoftDeleteModel):
 
     def __str__(self):
         return f"Commande #{self.pk}"
+
+    @property
+    def amount_due(self):
+        """Ce qu'il reste à payer en ligne une fois l'avoir déduit."""
+        return self.total_amount - self.credit_used
 
 
 class VendorOrder(TimeStampedModel):

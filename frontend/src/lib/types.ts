@@ -125,7 +125,7 @@ export interface CartLine {
   subtotal: number
 }
 
-export type PaymentMethod = 'cash_on_delivery' | 'orange_money' | 'mtn_momo' | 'card'
+export type PaymentMethod = 'cash_on_delivery' | 'orange_money' | 'mtn_momo' | 'card' | 'store_credit'
 export type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled'
 export type VendorOrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
 
@@ -163,6 +163,9 @@ export interface Order {
   delivery_fee: number
   discount_amount: number
   total_amount: number
+  credit_used: number
+  amount_due: number
+  refunded_amount: number
   coupon_code: string | null
   status: OrderStatus
   status_label: string
@@ -330,6 +333,7 @@ export interface SiteConfig {
     payment_method: Choice[]
     vendor_order_status: (Choice & { action: string })[]
     vendor_order_step: Choice[]
+    credit_refund_status: Choice[]
     delivery_status: Choice[]
     document_type: Choice[]
     payout_method: Choice[]
@@ -346,6 +350,7 @@ export interface SiteConfig {
   }
   exchange_rates: Record<'EUR' | 'USD', number>
   payment_simulation: boolean
+  payment_merchant: { name: string; orange_money: string; mtn_momo: string }
   referral_reward: number
   affiliate_rate: number
   commission_rate: number
@@ -364,6 +369,7 @@ export interface Quote {
   delivery_delay: string
   coupon: string | null
   coupon_error: string
+  credit_available: number
   shops: { shop_name: string; subtotal: number; delivery_fee: number }[]
 }
 
@@ -581,4 +587,20 @@ export interface RiderProfile {
   rating: { rating: number | null; ratings_count: number }
   cash_debt: number
   cash_limit: number
+}
+
+export interface StoreCredit {
+  balance: number
+  entries: { id: number; kind: string; kind_label: string; amount: number; order: number | null; note: string; created_at: string }[]
+  refunds: {
+    id: number
+    amount: number
+    method: string
+    method_label: string
+    phone: string
+    status: 'pending' | 'paid' | 'rejected'
+    status_label: string
+    admin_note: string
+    created_at: string
+  }[]
 }

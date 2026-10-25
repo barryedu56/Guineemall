@@ -15,12 +15,12 @@ def start_payment(order, payer_phone=""):
         raise PaymentError("Cette commande est déjà payée.")
     if order.status == Order.Status.CANCELLED:
         raise PaymentError("Cette commande a été annulée.")
-    if order.payment_method == Order.PaymentMethod.CASH_ON_DELIVERY:
-        raise PaymentError("Cette commande se paie à la livraison.")
+    if order.payment_method in (Order.PaymentMethod.CASH_ON_DELIVERY, Order.PaymentMethod.STORE_CREDIT):
+        raise PaymentError("Cette commande ne se paie pas en ligne.")
 
     provider = get_provider(order.payment_method)
     payment = Payment.objects.create(
-        order=order, provider=order.payment_method, amount=order.total_amount, payer_phone=payer_phone
+        order=order, provider=order.payment_method, amount=order.amount_due, payer_phone=payer_phone
     )
     ref = payment.reference
     init = provider.initiate(
