@@ -1,3 +1,5 @@
+from django.test import override_settings
+
 from apps.accounts.models import User
 from apps.orders.tests import OrderTestCase
 
@@ -219,6 +221,7 @@ class RiderFlowTests(OrderTestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("reverser", r.data["detail"])
 
+    @override_settings(MEDIA_ROOT="/tmp/claude-1000/guineemall-test-media")
     def test_discussion_boutique_livreur(self):
         url = f"/api/delivery/{self.delivery.pk}/messages/"
         self.client.force_authenticate(self.madina.user)
