@@ -95,24 +95,41 @@ def release_funds(vendor_order):
     return True
 
 
+IN_PROGRESS = [PayoutRequest.Status.PENDING, PayoutRequest.Status.SENDING]
+
+
 @transaction.atomic
-def request_payout(user, amount, method, phone):
+def request_payout(user, amount):
+    """Retrait vers le numéro vérifié de l'utilisateur (jamais vers un numéro saisi au moment du retrait)."""
+    from django.contrib.auth import get_user_model
+
+    from .accounts import account_for_payout
+
+    get_user_model().objects.select_for_update().get(pk=user.pk)  # deux demandes simultanées ne dépassent pas le solde
+    account = account_for_payout(user)
     balance = LedgerEntry.balance(user)
-    pending = sum(user.payouts.filter(status=PayoutRequest.Status.PENDING).values_list("amount", flat=True))
+    pending = sum(user.payouts.filter(status__in=IN_PROGRESS).values_list("amount", flat=True))
     if amount <= 0:
         raise ValueError("Le montant doit être positif.")
     if amount > balance - pending:
         raise ValueError(f"Solde disponible insuffisant ({gnf(max(0, balance - pending))}).")
-    payout = PayoutRequest.objects.create(user=user, amount=amount, method=method, phone=phone)
-    audit(user, "payout.requested", payout, {"amount": amount, "method": method})
-    notify_team("Demande de retrait à traiter", f"{user.name} : {gnf(amount)} vers {payout.get_method_display()}.")
+    payout = PayoutRequest.objects.create(user=user, amount=amount, method=account.method, phone=account.phone)
+    audit(user, "payout.requested", payout, {"amount": amount, "method": account.method})
+    from .tasks import send_transfer
+
+    # Envoi automatique si l'opérateur le permet ; sinon l'équipe est prévenue
+    transaction.on_commit(lambda: send_transfer.delay("payout", payout.pk))
+    notify_team("Demande de retrait", f"{user.name} : {gnf(amount)} vers {payout.get_method_display()} {payout.phone}.",
+                "/administration/retraits?status=pending")
     return payout
 
 
 @transaction.atomic
-def process_payout(payout, admin, paid, reference="", note=""):
+def process_payout(payout, admin, paid, reference="", note="", automatic=False):
     payout = PayoutRequest.objects.select_for_update().get(pk=payout.pk)
-    if payout.status != PayoutRequest.Status.PENDING:
+    if payout.status == PayoutRequest.Status.SENDING and not automatic:
+        raise ValueError("Envoi automatique en cours : attendez la réponse de l'opérateur.")
+    if payout.status not in IN_PROGRESS:
         return payout
     payout.status = PayoutRequest.Status.PAID if paid else PayoutRequest.Status.REJECTED
     payout.transaction_reference = reference

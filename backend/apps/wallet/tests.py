@@ -125,15 +125,23 @@ class EscrowTests(OrderTestCase):
         self.assertIsNone(VendorOrder.objects.get(order_id=order_id).order.affiliate)
 
 
+def verified_account(user, method="orange_money", phone="620000000"):
+    from .models import PayoutAccount
+
+    return PayoutAccount.objects.create(user=user, method=method, phone=phone, holder_name=user.name, status="verified")
+
+
 class PayoutTests(OrderTestCase):
     def test_retrait_limite_au_solde(self):
         LedgerEntry.objects.create(user=self.kipe.user, kind="adjustment", amount=100_000)
+        verified_account(self.kipe.user)
         self.client.force_authenticate(self.kipe.user)
-        data = {"method": "orange_money", "phone": "620000000"}
-        self.assertEqual(self.client.post("/api/wallet/payouts/", {**data, "amount": 150_000}).status_code, 400)
-        self.assertEqual(self.client.post("/api/wallet/payouts/", {**data, "amount": 80_000}).status_code, 201)
+        self.assertEqual(self.client.post("/api/wallet/payouts/", {"amount": 150_000}).status_code, 400)
+        r = self.client.post("/api/wallet/payouts/", {"amount": 80_000, "phone": "666666666"})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["phone"], "620000000")  # toujours le numéro vérifié, jamais celui envoyé
         # 80 000 déjà demandés : il ne reste que 20 000 disponibles
-        self.assertEqual(self.client.post("/api/wallet/payouts/", {**data, "amount": 30_000}).status_code, 400)
+        self.assertEqual(self.client.post("/api/wallet/payouts/", {"amount": 30_000}).status_code, 400)
         self.assertEqual(self.client.get("/api/wallet/").data["available"], 20_000)
 
     def test_admin_valide_le_retrait(self):
@@ -143,6 +151,73 @@ class PayoutTests(OrderTestCase):
         process_payout(payout, admin, paid=True, reference="OM123")
         process_payout(payout, admin, paid=True)  # double clic : sans effet
         self.assertEqual(balance(self.kipe.user), 40_000)
+
+
+class PayoutAccountTests(OrderTestCase):
+    """Numéro de retrait vérifié : un voleur de compte ne peut pas détourner l'argent."""
+
+    def setUp(self):
+        super().setUp()
+        self.kipe.user.set_password("MotDePasse123!")
+        self.kipe.user.save()
+        LedgerEntry.objects.create(user=self.kipe.user, kind="adjustment", amount=100_000)
+        self.client.force_authenticate(self.kipe.user)
+        self.admin = User.objects.create_superuser(email="admin@test.gn", password="x", name="Admin")
+
+    def save_account(self, phone="620000000", password="MotDePasse123!"):
+        return self.client.put("/api/wallet/account/", {"method": "orange_money", "phone": phone,
+                                                         "holder_name": "Mamadou Diallo", "password": password})
+
+    def test_parcours_numero_verifie(self):
+        from .accounts import verify_account
+        from .models import PayoutAccount
+
+        self.assertIn("Enregistrez", self.client.post("/api/wallet/payouts/", {"amount": 10_000}).data["detail"])
+        self.assertEqual(self.save_account(password="faux").status_code, 400)
+        self.assertEqual(self.save_account().data["status"], "pending")
+        self.assertIn("vérification", self.client.post("/api/wallet/payouts/", {"amount": 10_000}).data["detail"])
+        verify_account(PayoutAccount.objects.get(), self.admin, True)
+        self.assertEqual(self.client.post("/api/wallet/payouts/", {"amount": 10_000}).status_code, 201)
+
+        # Changement de numéro : nouvelle vérification + 48 h de blocage, l'utilisateur est alerté
+        self.assertEqual(self.save_account("666000000").data["status"], "pending")
+        self.assertTrue(self.kipe.user.notifications.filter(title="Numéro de retrait modifié").exists())
+        verify_account(PayoutAccount.objects.get(), self.admin, True)
+        self.assertIn("modifié récemment", self.client.post("/api/wallet/payouts/", {"amount": 10_000}).data["detail"])
+
+    @override_settings(PAYOUT_MODE="live", MTN_MOMO_DISBURSEMENT={"SUBSCRIPTION_KEY": "k", "API_USER": "u", "API_KEY": "s"})
+    def test_envoi_automatique_mtn(self):
+        from unittest.mock import MagicMock, patch
+
+        from .disbursement import check_transfers
+
+        verified_account(self.kipe.user, method="mtn_momo", phone="664000000")
+        token = MagicMock(status_code=200, json=lambda: {"access_token": "t", "expires_in": 3600})
+        sent = MagicMock(status_code=202)
+        with patch("apps.wallet.disbursement.requests.post", side_effect=[token, sent]) as post, \
+                self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post("/api/wallet/payouts/", {"amount": 60_000})
+        self.assertEqual(post.call_args.kwargs["json"]["payee"]["partyId"], "224664000000")
+        payout = PayoutRequest.objects.get()
+        self.assertEqual(payout.status, "sending")
+        self.assertEqual(r.status_code, 201)
+        # L'équipe ne peut pas payer une deuxième fois à la main pendant l'envoi
+        self.admin.totp_secret, self.admin.totp_enabled_at = "JBSWY3DPEHPK3PXP", timezone.now()
+        self.admin.save()
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.post(f"/api/backoffice/payouts/{payout.pk}/pay/", {"reference": "X"}).status_code, 400)
+
+        with patch("apps.wallet.disbursement.requests.get", return_value=MagicMock(content=b"1", json=lambda: {"status": "SUCCESSFUL"})):
+            self.assertEqual(check_transfers(), 1)
+        payout.refresh_from_db()
+        self.assertEqual(payout.status, "paid")
+        self.assertEqual(balance(self.kipe.user), 40_000)
+
+    def test_orange_reste_manuel_sans_contrat(self):
+        verified_account(self.kipe.user)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post("/api/wallet/payouts/", {"amount": 60_000})
+        self.assertEqual(PayoutRequest.objects.get().status, "pending")
 
 
 @override_settings(PAYMENT_MODE="simulation")
@@ -201,9 +276,10 @@ class StoreCreditTests(OrderTestCase):
         from .models import CreditRefund
 
         self.give_credit(50_000)
-        r = self.client.post("/api/wallet/credit/cash-out/", {"amount": 80_000, "method": "orange_money", "phone": "620000001"})
+        verified_account(self.user, phone="620000001")
+        r = self.client.post("/api/wallet/credit/cash-out/", {"amount": 80_000})
         self.assertEqual(r.status_code, 400)
-        r = self.client.post("/api/wallet/credit/cash-out/", {"amount": 50_000, "method": "orange_money", "phone": "620000001"})
+        r = self.client.post("/api/wallet/credit/cash-out/", {"amount": 50_000})
         self.assertEqual(r.status_code, 201, r.data)
         self.assertEqual(self.credit(), 0)  # réservé aussitôt
         admin = User.objects.create_superuser(email="adm@test.gn", password="x", name="Adm")

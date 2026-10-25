@@ -15,7 +15,7 @@ from apps.core.audit import audit
 from apps.delivery.models import Delivery, Rider
 from apps.orders.models import Order, VendorOrder
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import CashDeposit, CreditRefund, PayoutRequest
+from apps.wallet.models import CashDeposit, CreditRefund, PayoutAccount, PayoutRequest
 
 
 class IsPlatformAdmin(permissions.BasePermission):
@@ -82,6 +82,7 @@ def dashboard(request):
             "deliveries_open": Delivery.objects.filter(status=Delivery.Status.OPEN).count(),
             "deposits_pending": CashDeposit.objects.filter(status=CashDeposit.Status.PENDING).count(),
             "credit_refunds_pending": CreditRefund.objects.filter(status=CreditRefund.Status.PENDING).count(),
+            "payout_accounts_pending": PayoutAccount.objects.filter(status=PayoutAccount.Status.PENDING).count(),
             "codes_blocked": VendorOrder.objects.filter(
                 status=VendorOrder.Status.READY, delivery_code_attempts__gte=settings.DELIVERY_CODE_MAX_ATTEMPTS
             ).count(),

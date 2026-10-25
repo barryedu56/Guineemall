@@ -7,7 +7,7 @@ from apps.delivery.models import DeliveryZone, PickupPoint, Rider
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Campaign, Coupon
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import CashDeposit, CreditEntry, CreditRefund, PayoutRequest
+from apps.wallet.models import CashDeposit, CreditEntry, CreditRefund, PayoutAccount, PayoutRequest
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
@@ -175,6 +175,18 @@ class AdminPayoutSerializer(serializers.ModelSerializer):
         from apps.wallet.models import LedgerEntry
 
         return LedgerEntry.balance(payout.user)
+
+
+class AdminPayoutAccountSerializer(serializers.ModelSerializer):
+    user = UserMiniSerializer(read_only=True)
+    role_label = serializers.CharField(source="user.get_role_display", read_only=True)
+    method_label = serializers.CharField(source="get_method_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = PayoutAccount
+        fields = ["id", "user", "role_label", "method", "method_label", "phone", "holder_name", "status", "status_label",
+                  "admin_note", "hold_until", "updated_at", "verified_at"]
 
 
 class AdminCreditRefundSerializer(serializers.ModelSerializer):

@@ -56,6 +56,7 @@ class PayoutRequest(TimeStampedModel):
 
     class Status(models.TextChoices):
         PENDING = "pending", "En attente"
+        SENDING = "sending", "Envoi en cours"
         PAID = "paid", "Payé"
         REJECTED = "rejected", "Refusé"
 
@@ -69,6 +70,7 @@ class PayoutRequest(TimeStampedModel):
     phone = PhoneField("numéro")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     transaction_reference = models.CharField("référence du transfert", max_length=100, blank=True)
+    provider_reference = models.CharField("référence de l'envoi automatique", max_length=100, blank=True)
     admin_note = models.CharField(max_length=255, blank=True)
     processed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
@@ -156,6 +158,7 @@ class CreditRefund(TimeStampedModel):
 
     class Status(models.TextChoices):
         PENDING = "pending", "En attente"
+        SENDING = "sending", "Envoi en cours"
         PAID = "paid", "Remboursé"
         REJECTED = "rejected", "Refusé"
 
@@ -165,6 +168,7 @@ class CreditRefund(TimeStampedModel):
     phone = PhoneField("numéro")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     transaction_reference = models.CharField("référence du transfert", max_length=100, blank=True)
+    provider_reference = models.CharField("référence de l'envoi automatique", max_length=100, blank=True)
     admin_note = models.CharField(max_length=255, blank=True)
     processed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
@@ -178,3 +182,34 @@ class CreditRefund(TimeStampedModel):
 
     def __str__(self):
         return f"Remboursement {gnf(self.amount)} – {self.user}"
+
+
+class PayoutAccount(TimeStampedModel):
+    """
+    Numéro qui reçoit les retraits d'un utilisateur. Vérifié une fois par l'équipe (nom du titulaire) ;
+    le changer demande le mot de passe, repasse en vérification et bloque les retraits PAYOUT_ACCOUNT_HOLD_HOURS.
+    Protège contre le vol d'un compte : l'argent ne peut pas partir vers un autre numéro.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "En cours de vérification"
+        VERIFIED = "verified", "Vérifié"
+        REJECTED = "rejected", "Refusé"
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payout_account")
+    method = models.CharField(max_length=20, choices=PayoutRequest.Method.choices)
+    phone = PhoneField("numéro")
+    holder_name = models.CharField("nom du titulaire", max_length=150)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    admin_note = models.CharField(max_length=255, blank=True)
+    hold_until = models.DateTimeField("retraits bloqués jusqu'au", null=True, blank=True)
+    verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "compte de retrait"
+        verbose_name_plural = "comptes de retrait"
+        ordering = ["status", "-updated_at"]
+
+    def __str__(self):
+        return f"{self.get_method_display()} {self.phone} ({self.holder_name})"

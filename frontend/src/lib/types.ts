@@ -337,6 +337,7 @@ export interface SiteConfig {
     vendor_order_status: (Choice & { action: string })[]
     vendor_order_step: Choice[]
     credit_refund_status: Choice[]
+    payout_account_status: Choice[]
     delivery_status: Choice[]
     document_type: Choice[]
     payout_method: Choice[]
@@ -442,7 +443,7 @@ export interface Payout {
   amount: number
   method: 'orange_money' | 'mtn_momo'
   phone: string
-  status: 'pending' | 'paid' | 'rejected'
+  status: 'pending' | 'sending' | 'paid' | 'rejected'
   status_label: string
   admin_note: string
   created_at: string
@@ -594,6 +595,18 @@ export interface RiderProfile {
   cash_limit: number
 }
 
+export interface PayoutAccount {
+  method: string
+  method_label: string
+  phone: string
+  holder_name: string
+  status: 'pending' | 'verified' | 'rejected'
+  status_label: string
+  admin_note: string
+  hold_until: string | null
+  ready: boolean
+}
+
 export interface StoreCredit {
   balance: number
   entries: { id: number; kind: string; kind_label: string; amount: number; order: number | null; note: string; created_at: string }[]
@@ -603,7 +616,7 @@ export interface StoreCredit {
     method: string
     method_label: string
     phone: string
-    status: 'pending' | 'paid' | 'rejected'
+    status: 'pending' | 'sending' | 'paid' | 'rejected'
     status_label: string
     admin_note: string
     created_at: string

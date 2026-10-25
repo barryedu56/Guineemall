@@ -10,7 +10,7 @@ from apps.delivery.models import Delivery, DeliveryZone, PickupPoint
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Coupon
 from apps.vendors.models import Vendor, VerificationRequest
-from apps.wallet.models import CashDeposit, CreditRefund, PayoutRequest
+from apps.wallet.models import CashDeposit, CreditRefund, PayoutAccount, PayoutRequest
 
 from .models import SiteSettings
 
@@ -104,6 +104,7 @@ def site_config(request):
             "deposit_status": choices(CashDeposit.Status),
             "payout_status": choices(PayoutRequest.Status),
             "credit_refund_status": choices(CreditRefund.Status),
+            "payout_account_status": choices(PayoutAccount.Status),
             "payment_status": choices(Order.PaymentStatus),
             "delivery_method": choices(Order.DeliveryMethod),
             "vendor_status": choices(Vendor.Status),

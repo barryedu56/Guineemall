@@ -135,6 +135,11 @@ du statut directement auprès de l'opérateur.
 - **Avoir** : une commande payée puis annulée (par le client ou la boutique) est remboursée aussitôt en avoir.
   L'avoir se déduit de la commande suivante, ou le client le demande sur son Mobile Money
   (Back-office › Avoirs clients). Il n'est jamais rechargé par le client : ce n'est pas de la monnaie électronique.
+- **Numéro de retrait vérifié** : chacun enregistre une fois le numéro qui reçoit son argent (avec le nom du
+  titulaire) ; l'équipe le vérifie (Back-office › Numéros de retrait). Le changer demande le mot de passe,
+  repasse en vérification et bloque les retraits 48 h. L'argent ne part jamais vers un autre numéro.
+- **Envoi automatique** : avec `PAYOUT_MODE=live` et les clés MTN « Disbursement », les retraits MTN partent
+  tout seuls et leur statut est suivi. Orange reste manuel tant que le contrat de transfert n'est pas signé.
 - Les retraits vers Orange Money ou MTN sont demandés dans le portefeuille et validés par un admin
   (Admin › Demandes de retrait › « Marquer comme payé »).
 
@@ -233,7 +238,7 @@ Toutes les routes sont préfixées par `/api/`. L'authentification se fait par J
 | Statuts | `statuts/` (fil groupé par boutique) · `statuts/<id>/view/` |
 | Social | `conversations/` (+ `start/`, `messages/`, `read/`, `typing/`) · `notifications/` · `auth/referral/` · `products/<slug>/reviews/` · `products/<slug>/share-image/` |
 | Promos et directs | `campaigns/` · `lives/` · `delivery/zones/` · `delivery/pickup-points/` · `config/` |
-| Portefeuille | `wallet/` · `wallet/payouts/` · `wallet/deposits/` · `wallet/credit/` (+ `cash-out/`) |
+| Portefeuille | `wallet/` · `wallet/payouts/` · `wallet/deposits/` · `wallet/credit/` (+ `cash-out/`) · `wallet/account/` |
 | Vendeur | `vendor/shop/` · `vendor/products/` · `vendor/orders/` (+ `counts/`, `<id>/status/`, `<id>/riders/`, `<id>/assign/`, `<id>/withdraw/`) · `vendor/statuts/` · `vendor/coupons/` · `vendor/reviews/` · `vendor/lives/` · `vendor/stats/` · `vendor/verification/` |
 | Livreur | `auth/register/rider/` · `rider/profile/` · `rider/deliveries/` (+ `accept/`, `decline/`, `pickup/`, `deliver/`, `release/`, `location/`) · `delivery/<id>/messages/` |
 | Temps réel | `ws/?token=<jwt>` (messages, notifications, position du livreur) · `ws/live/<id>/` (commentaires d'un direct) |

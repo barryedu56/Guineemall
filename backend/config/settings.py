@@ -199,6 +199,7 @@ CELERY_BEAT_SCHEDULE = {
     "annuler-commandes-non-payees": {"task": "apps.payments.tasks.expire_unpaid_orders", "schedule": 300},
     "liberer-paiements-sequestre": {"task": "apps.wallet.tasks.release_escrow", "schedule": 3600},
     "expirer-propositions-livreur": {"task": "apps.delivery.tasks.expire_offers", "schedule": 60},
+    "suivre-versements-automatiques": {"task": "apps.wallet.tasks.check_transfers", "schedule": 120},
     "supprimer-medias-statuts-expires": {"task": "apps.statuts.tasks.purge_expired_statuts", "schedule": 86400},
 }
 
@@ -245,6 +246,17 @@ STRIPE = {
     "SECRET_KEY": env("STRIPE_SECRET_KEY", default=""),
     "WEBHOOK_SECRET": env("STRIPE_WEBHOOK_SECRET", default=""),
 }
+# Versements aux vendeurs, livreurs et clients (avoir). "manual" : l'équipe envoie l'argent et saisit
+# la référence ; "live" : envoi automatique par l'API de l'opérateur quand elle est configurée.
+PAYOUT_MODE = env("PAYOUT_MODE", default="manual")
+MTN_MOMO_DISBURSEMENT = {
+    "SUBSCRIPTION_KEY": env("MTN_MOMO_DISBURSEMENT_SUBSCRIPTION_KEY", default=""),
+    "API_USER": env("MTN_MOMO_DISBURSEMENT_API_USER", default=""),
+    "API_KEY": env("MTN_MOMO_DISBURSEMENT_API_KEY", default=""),
+}
+# Après un changement de numéro de retrait, délai avant de pouvoir retirer à nouveau
+PAYOUT_ACCOUNT_HOLD_HOURS = 48
+
 # Taux indicatifs pour la diaspora (1 EUR / 1 USD en GNF), à mettre à jour par l'admin
 EXCHANGE_RATES = {"EUR": env.int("RATE_EUR_GNF", default=9400), "USD": env.int("RATE_USD_GNF", default=8600)}
 

@@ -26,6 +26,7 @@ interface Dashboard {
     deliveries_open: number
     deposits_pending: number
     credit_refunds_pending: number
+    payout_accounts_pending: number
     codes_blocked: number
   }
   recent_orders: { id: number; client: string; total: number; status: string; status_label: string; payment_label: string; created_at: string }[]
@@ -71,6 +72,7 @@ export default function AdminDashboard() {
     { count: data.todo.deliveries_open, label: 'course(s) sans livreur', icon: Truck, to: '/administration/commandes?status=processing' },
     { count: data.todo.deposits_pending, label: "versement(s) d'espèces à vérifier", icon: Banknote, to: '/administration/versements?status=pending' },
     { count: data.todo.credit_refunds_pending, label: "avoir(s) à rembourser sur Mobile Money", icon: RotateCcw, to: '/administration/avoirs?status=pending' },
+    { count: data.todo.payout_accounts_pending, label: 'numéro(s) de retrait à vérifier', icon: Wallet, to: '/administration/comptes-retrait?status=pending' },
     { count: data.todo.codes_blocked, label: 'code(s) de livraison bloqué(s)', icon: KeyRound, to: '/administration/commandes?status=processing' },
   ]
   const pending = todo.filter((t) => t.count > 0)

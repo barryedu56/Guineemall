@@ -8,7 +8,7 @@ import AdminLayout from './pages/admin/AdminLayout'
 import { AdminCategories, AdminProducts, AdminReviews } from './pages/admin/CatalogPages'
 import { AdminRiders, AdminUsers, AdminVendors, AdminVerifications } from './pages/admin/PartnerPages'
 import { AdminAudit, AdminCampaigns, AdminCoupons, AdminDelivery, AdminSettings } from './pages/admin/PlatformPages'
-import { AdminCreditRefunds, AdminDeposits, AdminOrderDetail, AdminOrders, AdminPayouts } from './pages/admin/SalesPages'
+import { AdminCreditRefunds, AdminDeposits, AdminOrderDetail, AdminOrders, AdminPayoutAccounts, AdminPayouts } from './pages/admin/SalesPages'
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VendorRegisterPage } from './pages/AuthPages'
 import CartPage from './pages/CartPage'
 import ChatPage from './pages/chat/ChatPage'
@@ -71,6 +71,7 @@ export default function App() {
             <Route path="retraits" element={<AdminPayouts />} />
             <Route path="versements" element={<AdminDeposits />} />
             <Route path="avoirs" element={<AdminCreditRefunds />} />
+            <Route path="comptes-retrait" element={<AdminPayoutAccounts />} />
             <Route path="boutiques" element={<AdminVendors />} />
             <Route path="verifications" element={<AdminVerifications />} />
             <Route path="livreurs" element={<AdminRiders />} />

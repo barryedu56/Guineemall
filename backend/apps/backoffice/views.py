@@ -20,7 +20,8 @@ from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Campaign, Coupon
 from apps.vendors.models import Vendor, VerificationRequest
 from apps.wallet.credit import process_cash_out
-from apps.wallet.models import CashDeposit, CreditRefund, PayoutRequest
+from apps.wallet.accounts import verify_account
+from apps.wallet.models import CashDeposit, CreditRefund, PayoutAccount, PayoutRequest
 from apps.wallet.services import process_deposit, process_payout
 
 from . import serializers as s
@@ -229,12 +230,12 @@ class PayoutViewSet(mixins.ListModelMixin, AdminViewSet):
 
     @action(detail=True, methods=["post"])
     def pay(self, request, pk=None):
-        payout = process_payout(self.get_object(), request.user, paid=True, reference=text(request, "reference", required=True))
+        payout = money_action(lambda: process_payout(self.get_object(), request.user, paid=True, reference=text(request, "reference", required=True)))
         return Response(self.get_serializer(payout).data)
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
-        payout = process_payout(self.get_object(), request.user, paid=False, note=text(request, "note", required=True))
+        payout = money_action(lambda: process_payout(self.get_object(), request.user, paid=False, note=text(request, "note", required=True)))
         return Response(self.get_serializer(payout).data)
 
 
@@ -256,6 +257,33 @@ class DepositViewSet(mixins.ListModelMixin, AdminViewSet):
         return Response(self.get_serializer(deposit).data)
 
 
+def money_action(fn):
+    try:
+        return fn()
+    except ValueError as e:
+        raise ValidationError({"detail": str(e)})
+
+
+class PayoutAccountViewSet(mixins.ListModelMixin, AdminViewSet):
+    """Numéros de retrait : vérifier que le nom du titulaire correspond avant le premier retrait."""
+
+    serializer_class = s.AdminPayoutAccountSerializer
+    filterset_fields = ["status", "method"]
+    search_fields = ["user__name", "user__email", "phone", "holder_name"]
+
+    def get_queryset(self):
+        return PayoutAccount.objects.select_related("user").order_by("status", "-updated_at")
+
+    @action(detail=True, methods=["post"])
+    def verify(self, request, pk=None):
+        return Response(self.get_serializer(verify_account(self.get_object(), request.user, True)).data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        account = verify_account(self.get_object(), request.user, False, text(request, "note", required=True))
+        return Response(self.get_serializer(account).data)
+
+
 class CreditRefundViewSet(mixins.ListModelMixin, AdminViewSet):
     """Avoirs que les clients demandent à recevoir sur Orange Money / MTN."""
 
@@ -268,12 +296,12 @@ class CreditRefundViewSet(mixins.ListModelMixin, AdminViewSet):
 
     @action(detail=True, methods=["post"])
     def pay(self, request, pk=None):
-        refund = process_cash_out(self.get_object(), request.user, paid=True, reference=text(request, "reference", required=True))
+        refund = money_action(lambda: process_cash_out(self.get_object(), request.user, paid=True, reference=text(request, "reference", required=True)))
         return Response(self.get_serializer(refund).data)
 
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
-        refund = process_cash_out(self.get_object(), request.user, paid=False, note=text(request, "note", required=True))
+        refund = money_action(lambda: process_cash_out(self.get_object(), request.user, paid=False, note=text(request, "note", required=True)))
         return Response(self.get_serializer(refund).data)
 
 

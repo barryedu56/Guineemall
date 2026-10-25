@@ -37,10 +37,15 @@ def refund_to_credit(order, amount, reason):
 
 
 @transaction.atomic
-def request_cash_out(user, amount, method, phone):
+def request_cash_out(user, amount):
+    """L'avoir part vers le numéro de retrait vérifié du client."""
     from apps.accounts.models import User
 
+    from .accounts import account_for_payout
+
     User.objects.select_for_update().get(pk=user.pk)  # deux demandes simultanées ne dépassent pas le solde
+    account = account_for_payout(user)
+    method, phone = account.method, account.phone
     available = balance(user)
     if amount <= 0:
         raise ValueError("Le montant doit être positif.")
@@ -50,15 +55,20 @@ def request_cash_out(user, amount, method, phone):
     CreditEntry.objects.create(user=user, kind=CreditEntry.Kind.CASH_OUT, amount=-amount, refund=refund,
                                note=f"Vers {refund.get_method_display()} {phone}")
     audit(user, "credit.cash_out_requested", refund, {"amount": amount, "method": method})
+    from .tasks import send_transfer
+
+    transaction.on_commit(lambda: send_transfer.delay("credit", refund.pk))
     notify_team("Avoir à rembourser", f"{user.name} : {gnf(amount)} vers {refund.get_method_display()} {phone}.",
                 "/administration/avoirs")
     return refund
 
 
 @transaction.atomic
-def process_cash_out(refund, admin, paid, reference="", note=""):
+def process_cash_out(refund, admin, paid, reference="", note="", automatic=False):
     refund = CreditRefund.objects.select_for_update().get(pk=refund.pk)
-    if refund.status != CreditRefund.Status.PENDING:
+    if refund.status == CreditRefund.Status.SENDING and not automatic:
+        raise ValueError("Envoi automatique en cours : attendez la réponse de l'opérateur.")
+    if refund.status not in (CreditRefund.Status.PENDING, CreditRefund.Status.SENDING):
         return refund
     refund.status = CreditRefund.Status.PAID if paid else CreditRefund.Status.REJECTED
     refund.transaction_reference = reference

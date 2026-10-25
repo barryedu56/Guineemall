@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Banknote, KeyRound, Package, RotateCcw, Wallet } from 'lucide-react'
+import { Banknote, KeyRound, Package, RotateCcw, ShieldCheck, Wallet } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import Price from '../../components/Price'
@@ -9,7 +9,7 @@ import { api, formatDate, formatPhone } from '../../lib/api'
 import { BO, useAdminAction, useAdminList } from './hooks'
 import { ListView, Toolbar } from './kit'
 import { useAsk } from './useAsk'
-import type { AdminCreditRefund, AdminDeposit, AdminOrder, AdminPayout } from './types'
+import type { AdminCreditRefund, AdminDeposit, AdminOrder, AdminPayout, AdminPayoutAccount } from './types'
 
 export function AdminOrders() {
   const { data: config } = useSiteConfig()
@@ -160,9 +160,50 @@ export function AdminPayouts() {
           { label: 'Montant', render: (p) => <Price amount={p.amount} className="font-bold" /> },
           { label: 'Vers', render: (p) => <>{p.method_label}<p className="text-xs text-ink/50">{formatPhone(p.phone)}</p></> },
           { label: 'Solde', render: (p) => <Price amount={p.balance} className="text-ink/60" /> },
-          { label: 'Statut', render: (p) => <><StatusBadge status={p.status === 'paid' ? 'delivered' : p.status === 'rejected' ? 'cancelled' : 'pending'} label={p.status_label} />{p.transaction_reference && <p className="text-xs text-ink/50">réf. {p.transaction_reference}</p>}</> },
+          { label: 'Statut', render: (p) => <><StatusBadge status={p.status === 'paid' ? 'delivered' : p.status === 'rejected' ? 'cancelled' : p.status === 'sending' ? 'processing' : 'pending'} label={p.status_label} />{p.transaction_reference && <p className="text-xs text-ink/50">réf. {p.transaction_reference}</p>}</> },
           { label: 'Actions', render: (p) => p.status === 'pending' && (
             <div className="flex gap-2"><Button size="sm" onClick={() => pay(p)}>Payé</Button><Button size="sm" variant="ghost" onClick={() => reject(p)}>Refuser</Button></div>
+          ) },
+        ]}
+      />
+    </>
+  )
+}
+
+export function AdminPayoutAccounts() {
+  const { data: config } = useSiteConfig()
+  const query = useAdminList<AdminPayoutAccount>('payout-accounts', ['status', 'method'])
+  const action = useAdminAction('payout-accounts')
+  const [ask, dialog] = useAsk()
+
+  async function reject(a: AdminPayoutAccount) {
+    const note = await ask({ title: `Refuser le numéro de ${a.user.name}`, label: 'Motif (envoyé à la personne)', confirm: 'Refuser', danger: true, required: true })
+    if (note) action.mutate({ id: a.id, action: 'reject', body: { note }, success: 'Numéro refusé, personne prévenue' })
+  }
+
+  return (
+    <>
+      {dialog}
+      <PageHeader
+        title="Numéros de retrait"
+        subtitle="Avant le premier retrait, vérifiez que le numéro appartient bien à la personne : dans l'application Orange Money ou MoMo, commencez un transfert vers ce numéro (sans le valider) — le nom du titulaire s'affiche. Il doit correspondre."
+      />
+      <Toolbar searchPlaceholder="Nom, email, numéro, titulaire" filters={[{ key: 'status', label: 'Statut', options: config?.choices.payout_account_status ?? [] }]} />
+      <ListView
+        query={query}
+        emptyIcon={<ShieldCheck />}
+        emptyTitle="Aucun numéro à vérifier"
+        columns={[
+          { label: 'Modifié le', render: (a) => formatDate(a.updated_at) },
+          { label: 'Compte', render: (a) => <><p className="font-medium">{a.user.name}</p><p className="text-xs text-ink/50">{a.role_label} · {a.user.email}</p></> },
+          { label: 'Numéro', render: (a) => <>{a.method_label}<p className="font-semibold">{formatPhone(a.phone)}</p></> },
+          { label: 'Titulaire déclaré', render: (a) => <span className="font-semibold">{a.holder_name}</span> },
+          { label: 'Statut', render: (a) => <><StatusBadge status={a.status === 'verified' ? 'delivered' : a.status === 'rejected' ? 'cancelled' : 'pending'} label={a.status_label} />{a.hold_until && <p className="text-xs text-ink/50">changé : retraits après le {formatDate(a.hold_until)}</p>}</> },
+          { label: 'Actions', render: (a) => a.status === 'pending' && (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => action.mutate({ id: a.id, action: 'verify', success: 'Numéro vérifié, personne prévenue' })}>Le nom correspond</Button>
+              <Button size="sm" variant="ghost" onClick={() => reject(a)}>Refuser</Button>
+            </div>
           ) },
         ]}
       />
@@ -200,7 +241,7 @@ export function AdminCreditRefunds() {
           { label: 'Montant', render: (r) => <Price amount={r.amount} className="font-bold" /> },
           { label: 'Vers', render: (r) => <>{r.method_label}<p className="text-xs text-ink/50">{formatPhone(r.phone)}</p></> },
           { label: 'Avoir restant', render: (r) => <Price amount={r.credit_balance} className="text-ink/60" /> },
-          { label: 'Statut', render: (r) => <><StatusBadge status={r.status === 'paid' ? 'delivered' : r.status === 'rejected' ? 'cancelled' : 'pending'} label={r.status_label} />{r.transaction_reference && <p className="text-xs text-ink/50">réf. {r.transaction_reference}</p>}</> },
+          { label: 'Statut', render: (r) => <><StatusBadge status={r.status === 'paid' ? 'delivered' : r.status === 'rejected' ? 'cancelled' : r.status === 'sending' ? 'processing' : 'pending'} label={r.status_label} />{r.transaction_reference && <p className="text-xs text-ink/50">réf. {r.transaction_reference}</p>}</> },
           { label: 'Actions', render: (r) => r.status === 'pending' && (
             <div className="flex gap-2"><Button size="sm" onClick={() => pay(r)}>Remboursé</Button><Button size="sm" variant="ghost" onClick={() => reject(r)}>Refuser</Button></div>
           ) },

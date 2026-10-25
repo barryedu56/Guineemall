@@ -1,5 +1,5 @@
 from django.db.models import Sum
-from rest_framework import mixins, permissions, status, viewsets
+from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -8,7 +8,9 @@ from apps.orders.models import Order, VendorOrder
 
 from . import credit
 from .models import CreditEntry, LedgerEntry, PayoutRequest
+from .accounts import set_account
 from .serializers import (
+    PayoutAccountSerializer,
     CashDepositSerializer,
     CreditEntrySerializer,
     CreditRefundSerializer,
@@ -27,7 +29,8 @@ class WalletViewSet(viewsets.GenericViewSet):
         user = request.user
         balance = LedgerEntry.balance(user)
         pending_payouts = (
-            user.payouts.filter(status=PayoutRequest.Status.PENDING).aggregate(t=Sum("amount"))["t"] or 0
+            user.payouts.filter(status__in=[PayoutRequest.Status.PENDING, PayoutRequest.Status.SENDING])
+            .aggregate(t=Sum("amount"))["t"] or 0
         )
         escrow = 0
         vendor = getattr(user, "vendor", None)
@@ -119,3 +122,27 @@ class CreditViewSet(viewsets.GenericViewSet):
         except ValueError as e:
             raise ValidationError({"detail": str(e)})
         return Response(self.get_serializer(refund).data, status=status.HTTP_201_CREATED)
+
+
+class PayoutAccountView(generics.GenericAPIView):
+    """GET /wallet/account/ : numéro de retrait · PUT {method, phone, holder_name, password} : l'enregistrer ou le changer."""
+
+    serializer_class = PayoutAccountSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = "money"
+
+    def get_throttles(self):
+        return super().get_throttles() if self.request.method == "PUT" else []
+
+    def get(self, request):
+        account = getattr(request.user, "payout_account", None)
+        return Response(self.get_serializer(account).data if account else None)
+
+    def put(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            account = set_account(request.user, **serializer.validated_data)
+        except ValueError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(account).data)

@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import CashDeposit, CreditEntry, CreditRefund, LedgerEntry, PayoutRequest
+from .models import CashDeposit, CreditEntry, CreditRefund, LedgerEntry, PayoutAccount, PayoutRequest
 from .services import process_deposit, process_payout
 
 
@@ -71,3 +71,11 @@ class CreditRefundAdmin(admin.ModelAdmin):
     list_display = ["user", "amount", "method", "phone", "status", "created_at"]
     list_filter = ["status", "method"]
     readonly_fields = ["user", "amount", "method", "phone", "status", "processed_by", "processed_at"]
+
+
+@admin.register(PayoutAccount)
+class PayoutAccountAdmin(admin.ModelAdmin):
+    list_display = ["user", "method", "phone", "holder_name", "status", "updated_at"]
+    list_filter = ["status", "method"]
+    search_fields = ["user__email", "user__name", "phone", "holder_name"]
+    readonly_fields = ["user", "method", "phone", "holder_name", "status", "hold_until", "verified_by", "verified_at"]

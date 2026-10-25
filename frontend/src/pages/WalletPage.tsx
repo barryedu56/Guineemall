@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Lock, RotateCcw, Wallet as WalletIcon } from 'lucide-react'
+import { BadgeCheck, Clock, Lock, RotateCcw, ShieldAlert, Wallet as WalletIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import Price from '../components/Price'
@@ -8,15 +8,16 @@ import { useAuth } from '../context/auth'
 import { useSiteConfig } from '../context/settings'
 import { useToast } from '../context/toast'
 import { api, errorMessage, formatDate, formatPhone } from '../lib/api'
-import type { CashDeposit, Payout, StoreCredit, Wallet } from '../lib/types'
+import type { CashDeposit, Payout, PayoutAccount, StoreCredit, Wallet } from '../lib/types'
 
 /** Portefeuille : vendeurs (ventes), ambassadeurs (commissions), livreurs (courses). */
 export default function WalletPage() {
-  const { user } = useAuth()
   const { data: config } = useSiteConfig()
   const queryClient = useQueryClient()
-  const [form, setForm] = useState({ amount: '', method: 'orange_money', phone: user?.phone ?? '' })
+  const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const { data: account } = usePayoutAccount()
+  const ready = accountReady(account)
 
   const { data: wallet, isLoading } = useQuery({
     queryKey: ['wallet'],
@@ -28,9 +29,9 @@ export default function WalletPage() {
   })
 
   const withdraw = useMutation({
-    mutationFn: () => api.post('/wallet/payouts/', { ...form, amount: Number(form.amount) }),
+    mutationFn: () => api.post('/wallet/payouts/', { amount: Number(amount) }),
     onSuccess: () => {
-      setForm({ ...form, amount: '' })
+      setAmount('')
       queryClient.invalidateQueries({ queryKey: ['wallet'] })
       queryClient.invalidateQueries({ queryKey: ['payouts'] })
     },
@@ -70,18 +71,23 @@ export default function WalletPage() {
 
       {wallet.debt > 0 && <DepositForm debt={wallet.debt} />}
 
+      <PayoutAccountCard />
+
       <form onSubmit={submit} className="space-y-3 card p-6">
         <h2 className="text-lg font-semibold">Retirer mon argent</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <AmountInput label="Montant (GNF)" value={form.amount} onValueChange={(amount) => setForm({ ...form, amount })} required />
-          <Select label="Vers" value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
-            {config?.choices.payout_method.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </Select>
-          <PhoneInput label="Numéro" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
-        </div>
-        <ErrorBox message={error} />
-        <Button type="submit" loading={withdraw.isPending} disabled={wallet.available <= 0}>Demander le retrait</Button>
-        <p className="text-xs text-ink/60">Les retraits sont vérifiés puis envoyés par l'équipe {config?.site.name}. Vous êtes prévenu dès que c'est fait.</p>
+        {ready && account ? (
+          <>
+            <div className="flex flex-wrap items-end gap-3">
+              <AmountInput label="Montant (GNF)" value={amount} onValueChange={setAmount} required />
+              <p className="pb-2.5 text-sm text-ink/70">vers {account.method_label} <strong>{formatPhone(account.phone)}</strong> ({account.holder_name})</p>
+            </div>
+            <ErrorBox message={error} />
+            <Button type="submit" loading={withdraw.isPending} disabled={wallet.available <= 0}>Demander le retrait</Button>
+            <p className="text-xs text-ink/60">Vous êtes prévenu dès que l'argent est envoyé.</p>
+          </>
+        ) : (
+          <p className="text-sm text-ink/60">Les retraits s'ouvrent dès que votre numéro de retrait est vérifié (ci-dessus).</p>
+        )}
       </form>
 
       {payouts.length > 0 && (
@@ -93,7 +99,7 @@ export default function WalletPage() {
                 <span>{formatDate(p.created_at)} · {config?.choices.payout_method.find((c) => c.value === p.method)?.label} {formatPhone(p.phone)}</span>
                 <span className="flex items-center gap-2">
                   <Price amount={p.amount} />
-                  <Badge tone={p.status === 'paid' ? 'success' : p.status === 'rejected' ? 'danger' : 'warning'}>{p.status_label}</Badge>
+                  <Badge tone={p.status === 'paid' ? 'success' : p.status === 'rejected' ? 'danger' : p.status === 'sending' ? 'info' : 'warning'}>{p.status_label}</Badge>
                 </span>
               </li>
             ))}
@@ -179,23 +185,22 @@ function DepositForm({ debt }: { debt: number }) {
 
 /** Avoir du client (commandes remboursées) : dépensé à la commande ou rendu sur Mobile Money. */
 function StoreCreditSection() {
-  const { user } = useAuth()
   const toast = useToast()
   const queryClient = useQueryClient()
   const { data: config } = useSiteConfig()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ amount: '', method: '', phone: user?.phone ?? '' })
-  const method = form.method || config?.choices.payout_method[0]?.value || ''
+  const [amount, setAmount] = useState('')
+  const { data: account } = usePayoutAccount()
   const { data: credit } = useQuery({
     queryKey: ['store-credit'],
     queryFn: async () => (await api.get<StoreCredit>('/wallet/credit/')).data,
   })
   const cashOut = useMutation({
-    mutationFn: () => api.post('/wallet/credit/cash-out/', { ...form, method, amount: Number(form.amount) }),
+    mutationFn: () => api.post('/wallet/credit/cash-out/', { amount: Number(amount) }),
     onSuccess: () => {
-      toast("Demande envoyée : l'équipe vous envoie l'argent")
+      toast("Demande envoyée : vous êtes prévenu dès que l'argent est envoyé")
       setOpen(false)
-      setForm({ ...form, amount: '' })
+      setAmount('')
       queryClient.invalidateQueries({ queryKey: ['store-credit'] })
     },
     onError: (e) => toast(errorMessage(e), 'error'),
@@ -211,20 +216,23 @@ function StoreCreditSection() {
           <p className="text-sm text-ink/60">Argent de vos commandes annulées. Il se déduit automatiquement de votre prochaine commande.</p>
         </div>
         {credit.balance > 0 && !open && (
-          <Button variant="outline" onClick={() => { setForm({ ...form, amount: String(credit.balance) }); setOpen(true) }}>
+          <Button variant="outline" onClick={() => { setAmount(String(credit.balance)); setOpen(true) }}>
             Le recevoir sur mon Mobile Money
           </Button>
         )}
       </div>
       {open && (
-        <form onSubmit={(e) => { e.preventDefault(); cashOut.mutate() }} className="grid gap-3 rounded-2xl bg-background p-4 sm:grid-cols-3">
-          <AmountInput label="Montant (GNF)" value={form.amount} onValueChange={(amount) => setForm({ ...form, amount })} required />
-          <Select label="Vers" value={method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
-            {config?.choices.payout_method.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </Select>
-          <PhoneInput label="Numéro" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
-          <div className="flex gap-2 sm:col-span-3">
-            <Button type="submit" loading={cashOut.isPending}>Demander le remboursement</Button>
+        <form onSubmit={(e) => { e.preventDefault(); cashOut.mutate() }} className="space-y-3 rounded-2xl bg-background p-4">
+          {accountReady(account) && account ? (
+            <div className="flex flex-wrap items-end gap-3">
+              <AmountInput label="Montant (GNF)" value={amount} onValueChange={setAmount} required />
+              <p className="pb-2.5 text-sm text-ink/70">vers {account.method_label} <strong>{formatPhone(account.phone)}</strong></p>
+            </div>
+          ) : (
+            <p className="text-sm text-ink/70">Enregistrez d'abord votre numéro de retrait ci-dessous ; l'équipe le vérifie, puis vous pourrez recevoir votre avoir.</p>
+          )}
+          <div className="flex gap-2">
+            <Button type="submit" loading={cashOut.isPending} disabled={!accountReady(account)}>Demander le remboursement</Button>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
           </div>
         </form>
@@ -258,6 +266,106 @@ function StoreCreditSection() {
           ))}
         </ul>
       </details>
+    </section>
+  )
+}
+
+function usePayoutAccount() {
+  return useQuery({
+    queryKey: ['payout-account'],
+    queryFn: async () => (await api.get<PayoutAccount | null>('/wallet/account/')).data,
+  })
+}
+
+function accountReady(account: PayoutAccount | null | undefined) {
+  return !!account?.ready
+}
+
+/** Numéro qui reçoit l'argent : enregistré une fois, vérifié par l'équipe, modifiable avec le mot de passe. */
+function PayoutAccountCard() {
+  const { user } = useAuth()
+  const toast = useToast()
+  const queryClient = useQueryClient()
+  const { data: config } = useSiteConfig()
+  const { data: account, isLoading } = usePayoutAccount()
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({ method: '', phone: '', holder_name: '', password: '' })
+  const save = useMutation({
+    mutationFn: async () => (await api.put<PayoutAccount>('/wallet/account/', { ...form, method: form.method || config?.choices.payout_method[0]?.value })).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['payout-account'], data)
+      setEditing(false)
+      toast("Numéro enregistré : l'équipe le vérifie")
+    },
+    onError: (e) => toast(errorMessage(e), 'error'),
+  })
+  if (isLoading) return null
+
+  function edit() {
+    setForm({ method: account?.method ?? '', phone: account?.phone ?? user?.phone ?? '', holder_name: account?.holder_name ?? user?.name ?? '', password: '' })
+    setEditing(true)
+  }
+
+  if (editing || !account) {
+    if (!editing && !account) {
+      return (
+        <section className="card flex flex-wrap items-center gap-4 p-6">
+          <ShieldAlert className="size-8 text-amber-600" />
+          <div className="flex-1">
+            <p className="font-semibold">Où voulez-vous recevoir votre argent ?</p>
+            <p className="text-sm text-ink/60">Enregistrez une fois votre numéro Orange Money ou MTN. Pour votre sécurité, l'argent ne partira que vers ce numéro.</p>
+          </div>
+          <Button onClick={edit}>Enregistrer mon numéro</Button>
+        </section>
+      )
+    }
+    return (
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate() }} className="card space-y-3 p-6">
+        <h2 className="text-lg font-semibold">Numéro de retrait</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Select label="Opérateur" value={form.method || config?.choices.payout_method[0]?.value} onChange={(e) => setForm({ ...form, method: e.target.value })}>
+            {config?.choices.payout_method.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </Select>
+          <PhoneInput label="Numéro" value={form.phone} onValueChange={(phone) => setForm({ ...form, phone })} required />
+          <Input label="Nom du titulaire" value={form.holder_name} onChange={(e) => setForm({ ...form, holder_name: e.target.value })} required hint="Tel qu'enregistré chez l'opérateur" />
+        </div>
+        <Input label="Votre mot de passe" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required autoComplete="current-password" hint="Redemandé pour vérifier que c'est bien vous" />
+        {account?.status === 'verified' && (
+          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            Après un changement, le nouveau numéro est revérifié et les retraits sont bloqués 48 h par sécurité.
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button type="submit" loading={save.isPending}>Enregistrer</Button>
+          <Button type="button" variant="ghost" onClick={() => setEditing(false)}>Annuler</Button>
+        </div>
+      </form>
+    )
+  }
+
+  const onHold = account.status === 'verified' && !account.ready
+  return (
+    <section className="card flex flex-wrap items-center gap-4 p-6">
+      {account.status === 'verified' && !onHold ? (
+        <BadgeCheck className="size-8 text-green-600" />
+      ) : account.status === 'rejected' ? (
+        <ShieldAlert className="size-8 text-red-600" />
+      ) : (
+        <Clock className="size-8 text-amber-600" />
+      )}
+      <div className="flex-1">
+        <p className="font-semibold">{account.method_label} · {formatPhone(account.phone)} · {account.holder_name}</p>
+        <p className="text-sm text-ink/60">
+          {account.status === 'rejected'
+            ? `Refusé${account.admin_note ? ` : ${account.admin_note}` : ''}. Corrigez votre numéro.`
+            : account.status === 'pending'
+              ? "En cours de vérification par l'équipe (nom du titulaire). Vous serez prévenu."
+              : onHold
+                ? `Numéro vérifié. Par sécurité, retraits possibles à partir du ${formatDate(account.hold_until!)}.`
+                : 'Numéro vérifié : votre argent est envoyé ici.'}
+        </p>
+      </div>
+      <Button variant="outline" size="sm" onClick={edit}>Changer</Button>
     </section>
   )
 }

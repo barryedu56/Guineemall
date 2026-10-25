@@ -8,4 +8,6 @@ router.register("wallet/deposits", views.CashDepositViewSet, basename="deposit")
 router.register("wallet/credit", views.CreditViewSet, basename="credit")
 router.register("wallet", views.WalletViewSet, basename="wallet")
 
-urlpatterns = router.urls
+from django.urls import path
+
+urlpatterns = [path("wallet/account/", views.PayoutAccountView.as_view(), name="payout-account"), *router.urls]
