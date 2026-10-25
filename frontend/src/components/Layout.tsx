@@ -71,6 +71,8 @@ const PARENTS: [RegExp, string][] = [
   [/^\/lives\/.+/, '/lives'],
   [/^\/vendeur\/messages\/.+/, '/vendeur/messages'],
   [/^\/vendeur\/.+/, '/vendeur'],
+  [/^\/administration\/commandes\/.+/, '/administration/commandes'],
+  [/^\/administration\/.+/, '/administration'],
   [/^\/paiement\//, '/commandes'],
   [/^\/mot-de-passe\//, '/connexion'],
 ]

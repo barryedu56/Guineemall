@@ -274,6 +274,13 @@ export interface SiteConfig {
     document_type: Choice[]
     payout_method: Choice[]
     deposit_method: Choice[]
+    deposit_status: Choice[]
+    payout_status: Choice[]
+    payment_status: Choice[]
+    delivery_method: Choice[]
+    vendor_status: Choice[]
+    verification_status: Choice[]
+    user_role: Choice[]
     coupon_type: Choice[]
     product_sort: Choice[]
   }

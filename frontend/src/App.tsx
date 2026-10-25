@@ -4,6 +4,11 @@ import Layout from './components/Layout'
 import RequireAuth, { GuestOnly } from './components/RequireAuth'
 import { AccountPage, FavoritesPage } from './pages/AccountPages'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminLayout from './pages/admin/AdminLayout'
+import { AdminCategories, AdminProducts, AdminReviews } from './pages/admin/CatalogPages'
+import { AdminRiders, AdminUsers, AdminVendors, AdminVerifications } from './pages/admin/PartnerPages'
+import { AdminAudit, AdminCampaigns, AdminCoupons, AdminDelivery, AdminSettings } from './pages/admin/PlatformPages'
+import { AdminDeposits, AdminOrderDetail, AdminOrders, AdminPayouts } from './pages/admin/SalesPages'
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VendorRegisterPage } from './pages/AuthPages'
 import CartPage from './pages/CartPage'
 import ChatPage from './pages/chat/ChatPage'
@@ -58,7 +63,25 @@ export default function App() {
           <Route path="/parrainage" element={<RequireAuth><ReferralPage /></RequireAuth>} />
           <Route path="/portefeuille" element={<RequireAuth><WalletPage /></RequireAuth>} />
           <Route path="/livreur" element={<RequireAuth role="livreur"><RiderDashboard /></RequireAuth>} />
-          <Route path="/administration" element={<RequireAuth role="admin"><AdminDashboard /></RequireAuth>} />
+          <Route path="/administration" element={<RequireAuth role="admin"><AdminLayout /></RequireAuth>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="commandes" element={<AdminOrders />} />
+            <Route path="commandes/:id" element={<AdminOrderDetail />} />
+            <Route path="retraits" element={<AdminPayouts />} />
+            <Route path="versements" element={<AdminDeposits />} />
+            <Route path="boutiques" element={<AdminVendors />} />
+            <Route path="verifications" element={<AdminVerifications />} />
+            <Route path="livreurs" element={<AdminRiders />} />
+            <Route path="utilisateurs" element={<AdminUsers />} />
+            <Route path="produits" element={<AdminProducts />} />
+            <Route path="categories" element={<AdminCategories />} />
+            <Route path="avis" element={<AdminReviews />} />
+            <Route path="codes-promo" element={<AdminCoupons />} />
+            <Route path="operations" element={<AdminCampaigns />} />
+            <Route path="livraison" element={<AdminDelivery />} />
+            <Route path="reglages" element={<AdminSettings />} />
+            <Route path="journal" element={<AdminAudit />} />
+          </Route>
 
           <Route path="/vendeur" element={<RequireAuth role="vendeur"><VendorLayout /></RequireAuth>}>
             <Route index element={<VendorDashboard />} />

@@ -1,10 +1,8 @@
 from django.contrib import admin, messages
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.html import format_html_join
 
-from apps.core.audit import audit
-from apps.notifications.services import notify
+from apps.backoffice.services import approve_vendor, decide_verification, suspend_vendor
 
 from .models import Vendor, VerificationRequest
 
@@ -18,21 +16,14 @@ class VendorAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approuver les boutiques sélectionnées")
     def approve(self, request, queryset):
-        for vendor in queryset.exclude(status=Vendor.Status.APPROVED):
-            vendor.status = Vendor.Status.APPROVED
-            vendor.save(update_fields=["status", "updated_at"])
-            audit(request, "vendor.approved", vendor)
-            notify(vendor.user, "shop", "Votre boutique est en ligne 🎉",
-                   "Ajoutez vos produits et publiez votre premier statut.", "/vendeur")
+        for vendor in queryset:
+            approve_vendor(request.user, vendor)
         messages.success(request, "Boutiques approuvées.")
 
     @admin.action(description="Suspendre les boutiques sélectionnées")
     def suspend(self, request, queryset):
-        for vendor in queryset.exclude(status=Vendor.Status.SUSPENDED):
-            vendor.status = Vendor.Status.SUSPENDED
-            vendor.save(update_fields=["status", "updated_at"])
-            audit(request, "vendor.suspended", vendor)
-            notify(vendor.user, "shop", "Boutique suspendue", "Contactez GuinéeMall pour en savoir plus.", "/vendeur")
+        for vendor in queryset:
+            suspend_vendor(request.user, vendor)
 
 
 @admin.register(VerificationRequest)
@@ -52,22 +43,8 @@ class VerificationRequestAdmin(admin.ModelAdmin):
         )
 
     def _decide(self, request, queryset, approved):
-        for vr in queryset.filter(status=VerificationRequest.Status.PENDING).select_related("vendor__user"):
-            vr.status = VerificationRequest.Status.APPROVED if approved else VerificationRequest.Status.REJECTED
-            vr.reviewed_by = request.user
-            vr.reviewed_at = timezone.now()
-            vr.save()
-            audit(request, "verification.approved" if approved else "verification.rejected", vr.vendor, {"note": vr.admin_note})
-            if approved:
-                vr.vendor.is_verified = True
-                vr.vendor.verified_at = timezone.now()
-                vr.vendor.save(update_fields=["is_verified", "verified_at", "updated_at"])
-                notify(vr.vendor.user, "shop", "Badge « Vendeur vérifié » obtenu ✅",
-                       "Le badge apparaît maintenant sur votre boutique et vos produits.", "/vendeur/boutique")
-            else:
-                notify(vr.vendor.user, "shop", "Vérification refusée",
-                       vr.admin_note or "Vos documents n'ont pas pu être validés. Vous pouvez renvoyer une demande.",
-                       "/vendeur/boutique")
+        for vr in queryset:
+            decide_verification(request.user, vr, approved)
 
     @admin.action(description="Accepter (donner le badge)")
     def accept(self, request, queryset):

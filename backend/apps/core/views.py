@@ -4,11 +4,12 @@ from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
+from apps.accounts.models import User
 from apps.catalog.views import public_products
 from apps.delivery.models import DeliveryZone, PickupPoint
 from apps.orders.models import Order, VendorOrder
 from apps.promotions.models import Coupon
-from apps.vendors.models import VerificationRequest
+from apps.vendors.models import Vendor, VerificationRequest
 from apps.wallet.models import CashDeposit, PayoutRequest
 
 from .models import SiteSettings
@@ -91,6 +92,13 @@ def site_config(request):
             "document_type": choices(VerificationRequest.DocumentType),
             "payout_method": choices(PayoutRequest.Method),
             "deposit_method": choices(CashDeposit.Method),
+            "deposit_status": choices(CashDeposit.Status),
+            "payout_status": choices(PayoutRequest.Status),
+            "payment_status": choices(Order.PaymentStatus),
+            "delivery_method": choices(Order.DeliveryMethod),
+            "vendor_status": choices(Vendor.Status),
+            "verification_status": choices(VerificationRequest.Status),
+            "user_role": choices(User.Role),
             "coupon_type": choices(Coupon.Type),
             "product_sort": [
                 {"value": "-created_at", "label": "Plus récents"},

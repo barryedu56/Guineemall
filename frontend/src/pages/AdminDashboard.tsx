@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  Banknote, BadgeCheck, Bike, KeyRound, ExternalLink, Package, RotateCcw, Settings, ShoppingBag, Store, TrendingUp, Truck, Users, Wallet,
+  Banknote, BadgeCheck, Bike, KeyRound, ExternalLink, Package, RotateCcw, ShoppingBag, Store, TrendingUp, Truck, Users, Wallet,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { Link } from 'react-router-dom'
+
 import Price from '../components/Price'
-import TwoFactor from '../components/TwoFactor'
 import { PageHeader, Skeleton, StatusBadge } from '../components/ui'
 import { useAuth } from '../context/auth'
 import { useToast } from '../context/toast'
@@ -49,48 +50,34 @@ function useOpenAdmin() {
 export default function AdminDashboard() {
   const { user } = useAuth()
   const openAdmin = useOpenAdmin()
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: async () => (await api.get<Dashboard>('/admin/dashboard/')).data,
     refetchInterval: 60_000,
-    retry: false,
   })
-
-  // L'administration exige la double authentification : on la fait activer d'abord
-  if (!user?.has_2fa || (error && (error as { response?: { status?: number } }).response?.status === 403)) {
-    return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <PageHeader title="Sécurisez votre compte" subtitle="L'administration donne accès à l'argent de la plateforme : la double authentification est obligatoire." />
-        <TwoFactor onEnabled={() => refetch()} />
-      </div>
-    )
-  }
 
   if (isLoading || !data) {
     return <div className="grid gap-4 sm:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-28" />)}</div>
   }
 
-  // Chaque tâche ouvre directement la liste filtrée correspondante dans l'admin Django
+  // Chaque tâche ouvre la rubrique du back-office, déjà filtrée sur ce qui attend une action
   const todo = [
-    { count: data.todo.vendors_pending, label: 'boutique(s) à approuver', icon: Store, path: 'vendors/vendor/?status__exact=pending' },
-    { count: data.todo.verifications_pending, label: 'demande(s) de badge vérifié', icon: BadgeCheck, path: 'vendors/verificationrequest/?status__exact=pending' },
-    { count: data.todo.riders_pending, label: 'livreur(s) à valider', icon: Bike, path: 'delivery/rider/?is_approved__exact=0' },
-    { count: data.todo.payouts_pending, label: 'retrait(s) à payer', icon: Wallet, path: 'wallet/payoutrequest/?status__exact=pending', amount: data.todo.payouts_amount },
-    { count: data.todo.refunds_pending, label: 'remboursement(s) à faire', icon: RotateCcw, path: 'orders/order/?payment_status__exact=refund_pending' },
-    { count: data.todo.deliveries_open, label: 'course(s) sans livreur', icon: Truck, path: 'delivery/delivery/?status__exact=open' },
-    { count: data.todo.deposits_pending, label: "versement(s) d'espèces à vérifier", icon: Banknote, path: 'wallet/cashdeposit/?status__exact=pending' },
-    { count: data.todo.codes_blocked, label: 'code(s) de livraison bloqué(s)', icon: KeyRound, path: 'orders/vendororder/?status__exact=ready' },
+    { count: data.todo.vendors_pending, label: 'boutique(s) à approuver', icon: Store, to: '/administration/boutiques?status=pending' },
+    { count: data.todo.verifications_pending, label: 'demande(s) de badge vérifié', icon: BadgeCheck, to: '/administration/verifications?status=pending' },
+    { count: data.todo.riders_pending, label: 'livreur(s) à valider', icon: Bike, to: '/administration/livreurs?is_approved=false' },
+    { count: data.todo.payouts_pending, label: 'retrait(s) à payer', icon: Wallet, to: '/administration/retraits?status=pending', amount: data.todo.payouts_amount },
+    { count: data.todo.refunds_pending, label: 'remboursement(s) à faire', icon: RotateCcw, to: '/administration/commandes?payment_status=refund_pending' },
+    { count: data.todo.deliveries_open, label: 'course(s) sans livreur', icon: Truck, to: '/administration/commandes?status=processing' },
+    { count: data.todo.deposits_pending, label: "versement(s) d'espèces à vérifier", icon: Banknote, to: '/administration/versements?status=pending' },
+    { count: data.todo.codes_blocked, label: 'code(s) de livraison bloqué(s)', icon: KeyRound, to: '/administration/commandes?status=processing' },
   ]
   const pending = todo.filter((t) => t.count > 0)
 
   return (
     <div className="space-y-8">
       <PageHeader title={`Bonjour ${user?.name.split(' ')[0] ?? ''} 👋`} subtitle="Voici l'activité de la plateforme.">
-        <button onClick={() => openAdmin('core/sitesettings/1/change/')} className="inline-flex items-center gap-2 rounded-full border border-ink/15 bg-surface px-4 py-2 text-sm font-semibold hover:bg-ink/5">
-          <Settings className="size-4" /> Réglages du site
-        </button>
-        <button onClick={() => openAdmin('')} className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink/90">
-          Administration complète <ExternalLink className="size-4" />
+        <button onClick={() => openAdmin('')} className="inline-flex items-center gap-2 rounded-full border border-ink/15 bg-surface px-4 py-2 text-sm font-semibold hover:bg-ink/5" title="Interface technique Django, pour les cas avancés">
+          Admin technique <ExternalLink className="size-4" />
         </button>
       </PageHeader>
 
@@ -98,14 +85,14 @@ export default function AdminDashboard() {
         <h2 className="mb-3 text-lg font-extrabold">À traiter</h2>
         {pending.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pending.map(({ count, label, icon: Icon, path, amount }) => (
-              <button key={path} onClick={() => openAdmin(path)} className="card card-hover flex items-center gap-4 p-5 text-left">
+            {pending.map(({ count, label, icon: Icon, to, amount }) => (
+              <Link key={label} to={to} className="card card-hover flex items-center gap-4 p-5 text-left">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-ink"><Icon className="size-6" /></span>
                 <span>
                   <span className="block text-2xl font-extrabold">{formatNumber(count)}</span>
                   <span className="text-sm text-ink/60">{label}{amount ? <> · <Price amount={amount} /></> : null}</span>
                 </span>
-              </button>
+              </Link>
             ))}
           </div>
         ) : (
@@ -124,13 +111,13 @@ export default function AdminDashboard() {
         <section className="card p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-extrabold">Dernières commandes</h2>
-            <button onClick={() => openAdmin('orders/order/')} className="text-sm font-semibold text-primary-dark hover:underline">Tout voir</button>
+            <Link to="/administration/commandes" className="text-sm font-semibold text-primary-dark hover:underline">Tout voir</Link>
           </div>
           {data.recent_orders.length ? (
             <ul className="divide-y divide-ink/5">
               {data.recent_orders.map((o) => (
                 <li key={o.id}>
-                  <button onClick={() => openAdmin(`orders/order/${o.id}/change/`)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-ink/[0.02]">
+                  <Link to={`/administration/commandes/${o.id}`} className="flex w-full items-center gap-3 py-3 text-left hover:bg-ink/[0.02]">
                     <Package className="size-5 text-ink/40" />
                     <span className="flex-1">
                       <span className="block font-semibold">#{o.id} · {o.client}</span>
@@ -140,7 +127,7 @@ export default function AdminDashboard() {
                       <Price amount={o.total} className="block font-bold" />
                       <StatusBadge status={o.status} label={o.status_label} />
                     </span>
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -156,7 +143,7 @@ export default function AdminDashboard() {
               {data.top_shops.map((s, i) => (
                 <li key={s.slug} className="flex items-center gap-3">
                   <span className="flex size-7 items-center justify-center rounded-full bg-primary-light text-sm font-bold text-primary-dark">{i + 1}</span>
-                  <a href={`/boutique/${s.slug}`} className="flex-1 font-semibold hover:underline">{s.shop_name}</a>
+                  <Link to="/administration/boutiques" className="flex-1 font-semibold hover:underline">{s.shop_name}</Link>
                   <Price amount={s.revenue} className="text-sm font-bold" />
                 </li>
               ))}

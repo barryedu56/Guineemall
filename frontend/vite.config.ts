@@ -28,7 +28,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallbackDenylist: [/^\/api/, /^\/admin/, /^\/media/, /^\/static/, /^\/ws/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/admin\//, /^\/media\//, /^\/static\//, /^\/private\//, /^\/ws\//],
         runtimeCaching: [
           {
             // Catalogue : affiché depuis le cache si le réseau est lent, puis mis à jour
@@ -51,8 +51,10 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false },
       '/media': { target: 'http://127.0.0.1:8000', changeOrigin: false },
-      '/admin': { target: 'http://127.0.0.1:8000', changeOrigin: false },
-      '/static': { target: 'http://127.0.0.1:8000', changeOrigin: false },
+      // Expressions exactes : '/admin' seul capturerait aussi '/administration' (pages du site)
+      '^/admin/': { target: 'http://127.0.0.1:8000', changeOrigin: false },
+      '^/static/': { target: 'http://127.0.0.1:8000', changeOrigin: false },
+      '^/private/': { target: 'http://127.0.0.1:8000', changeOrigin: false },
       '/ws': { target: 'ws://127.0.0.1:8000', ws: true },
     },
   },

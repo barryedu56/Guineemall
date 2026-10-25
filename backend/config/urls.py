@@ -23,7 +23,7 @@ admin.site.login = admin_login
 
 API_APPS = [
     "vendors", "catalog", "orders", "statuts", "notifications", "payments",
-    "wallet", "promotions", "delivery", "chat", "lives",
+    "wallet", "promotions", "delivery", "chat", "lives", "backoffice",
 ]
 
 urlpatterns = [

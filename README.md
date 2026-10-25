@@ -133,7 +133,26 @@ WhatsApp Manager un modèle nommé `guineemall_notification`, en français, avec
 ```
 Sans jeton, les messages sont seulement écrits dans les logs du worker Celery.
 
-## Administration (http://127.0.0.1:8000/admin)
+## Back-office (dans le site : /administration)
+
+Réservé à l'équipe, avec double authentification. Tout se gère depuis le site :
+
+| Rubrique | Actions |
+|---|---|
+| Commandes | recherche et filtres, détail complet, remboursement effectué, déblocage d'un code de livraison |
+| Retraits / Versements | payer (avec référence) ou refuser, confirmer les espèces reversées |
+| Boutiques | approuver, suspendre (avec motif), retirer le badge, premium, commission propre |
+| Badges vérifiés | voir les pièces d'identité (consultation journalisée), accorder ou refuser |
+| Livreurs / Utilisateurs | valider, suspendre, désactiver un compte, réinitialiser la double authentification |
+| Produits / Avis / Catégories | masquer un produit ou un avis, gérer les catégories |
+| Codes promo / Opérations | créer, modifier, choisir les produits d'une opération |
+| Livraison | zones et tarifs, points relais |
+| Réglages du site | textes, contacts, réseaux sociaux, modes de paiement |
+| Journal d'audit | qui a fait quoi |
+
+L'admin Django (« Admin technique ») reste disponible pour les cas avancés.
+
+## Admin technique Django (/admin)
 
 - **Réglages du site** : nom, slogan, bandeau d'annonce, texte et image de l'accueil, coordonnées,
   réseaux sociaux, modes de paiement proposés. Le front ne contient aucune de ces valeurs en dur :
