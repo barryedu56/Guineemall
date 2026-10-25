@@ -149,6 +149,20 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
         return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
 
     @action(detail=True, methods=["post"])
+    def report(self, request, pk=None):
+        """Livraison bloquée (codes faux) : le client dit s'il a reçu le colis. {vendor_order, received}"""
+        from .disputes import client_report
+
+        vendor_order = self.get_object().vendor_orders.filter(pk=request.data.get("vendor_order")).first()
+        if vendor_order is None:
+            raise ValidationError({"detail": "Colis introuvable."})
+        try:
+            client_report(vendor_order, request.user, str(request.data.get("received")).lower() in ("true", "1"))
+        except services.OrderError as e:
+            raise ValidationError({"detail": str(e)})
+        return Response(self.get_serializer(self.get_queryset().get(pk=pk)).data)
+
+    @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         try:
             services.cancel_order(self.get_object(), request.user)
@@ -269,7 +283,7 @@ class VendorOrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, views
         try:
             # La boutique qui livre elle-même (ou remet au point relais) doit saisir le code du client
             checked = new_status == VendorOrder.Status.DELIVERED and services.check_delivery_code(
-                vendor_order, payload.validated_data.get("code")
+                vendor_order, payload.validated_data.get("code"), by=request.user
             )
             services.update_vendor_order_status(vendor_order, new_status, request.user, code_checked=checked)
         except services.OrderError as e:

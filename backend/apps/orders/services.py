@@ -59,30 +59,35 @@ def new_delivery_code():
     return f"{secrets.randbelow(10_000):04d}"
 
 
-def check_delivery_code(vendor_order, code):
+def check_delivery_code(vendor_order, code, by=None):
     """
     Vérifie le code de livraison donné par le client. À appeler hors transaction :
-    chaque code faux est compté, et après DELIVERY_CODE_MAX_ATTEMPTS la livraison est bloquée
-    jusqu'à ce qu'un admin la débloque (protection contre les essais au hasard).
+    chaque essai est enregistré, et après DELIVERY_CODE_MAX_ATTEMPTS codes faux la livraison est bloquée
+    jusqu'à ce que l'équipe tranche, après avoir appelé le client (voir apps.orders.disputes).
+    Le client est prévenu dès le 2ᵉ code faux : lui seul sait s'il a le colis entre les mains.
     """
+    from apps.orders.models import DeliveryCodeAttempt
+
     vendor_order.refresh_from_db(fields=["delivery_code", "delivery_code_attempts"])
     if vendor_order.delivery_code_attempts >= settings.DELIVERY_CODE_MAX_ATTEMPTS:
-        raise OrderError("Trop de codes faux : la livraison est bloquée. Contactez le service client.")
-    if not vendor_order.delivery_code or not hmac.compare_digest(vendor_order.delivery_code, str(code or "").strip()):
-        VendorOrder.objects.filter(pk=vendor_order.pk).update(delivery_code_attempts=F("delivery_code_attempts") + 1)
-        left = settings.DELIVERY_CODE_MAX_ATTEMPTS - vendor_order.delivery_code_attempts - 1
-        if left <= 0:
-            from apps.notifications.services import notify_team
+        raise OrderError("Trop de codes faux : la livraison est bloquée. L'équipe GuinéeMall contacte le client.")
+    ok = bool(vendor_order.delivery_code) and hmac.compare_digest(vendor_order.delivery_code, str(code or "").strip())
+    DeliveryCodeAttempt.objects.create(vendor_order=vendor_order, user=by, success=ok)
+    if ok:
+        return True
+    VendorOrder.objects.filter(pk=vendor_order.pk).update(delivery_code_attempts=F("delivery_code_attempts") + 1)
+    failures = vendor_order.delivery_code_attempts + 1
+    left = settings.DELIVERY_CODE_MAX_ATTEMPTS - failures
+    from .disputes import code_blocked, warn_client
 
-            notify_team(
-                f"Code de livraison bloqué – commande #{vendor_order.order_id}",
-                f"{settings.DELIVERY_CODE_MAX_ATTEMPTS} codes faux saisis ({vendor_order.vendor}). Vérifiez avant de débloquer.",
-            )
-        raise OrderError(
-            "Code de livraison incorrect. Demandez au client le code reçu par notification"
-            + (f" ({left} essai(s) restant(s))." if left > 0 else ". La livraison est maintenant bloquée.")
-        )
-    return True
+    if left <= 0:
+        code_blocked(vendor_order)
+    elif failures == 2:
+        warn_client(vendor_order)
+    raise OrderError(
+        "Code de livraison incorrect. Demandez au client le code affiché dans son suivi de commande"
+        + (f" ({left} essai(s) restant(s))." if left > 0 else ". La livraison est maintenant bloquée : l'équipe contacte le client.")
+    )
 
 
 def allowed_vendor_transitions(vendor_order):

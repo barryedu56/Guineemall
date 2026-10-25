@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bike, CheckCircle2, Clock, KeyRound, MapPin, Package, Star, XCircle } from 'lucide-react'
+import { Bike, CheckCircle2, Clock, KeyRound, MapPin, Package, ShieldAlert, Star, XCircle } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
@@ -209,7 +209,15 @@ export function OrderDetailPage() {
                 </li>
               ))}
             </ul>
-            {vo.delivery_code && (
+            {vo.code_blocked ? (
+              <BlockedDelivery orderId={order.id} vendorOrderId={vo.id} shop={vo.shop_name} report={vo.client_report} orderKey={key} />
+            ) : vo.status === 'ready' && vo.delivery_code_attempts > 0 && (
+              <p className="mt-3 flex gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                <ShieldAlert className="size-5 shrink-0" />
+                {vo.delivery_code_attempts} code(s) faux saisi(s) pour ce colis. Ne donnez votre code qu'au moment où le colis est entre vos mains.
+              </p>
+            )}
+            {vo.delivery_code && !vo.code_blocked && (
               <div className="mt-3 flex flex-wrap items-center gap-4 rounded-2xl bg-ink p-4 text-white">
                 <KeyRound className="size-6 text-primary" />
                 <div className="flex-1">
@@ -319,6 +327,39 @@ function RateRider({ deliveryId, riderName, given, orderKey }: { deliveryId: num
       <div className="flex gap-2">
         <input value={comment} onChange={(e) => setComment(e.target.value)} maxLength={300} placeholder="Un commentaire (facultatif)" className="min-w-0 flex-1 rounded-full border border-ink/10 bg-surface px-4 py-2 text-sm" />
         <Button size="sm" loading={rate.isPending} onClick={() => rate.mutate()}>Noter</Button>
+      </div>
+    </div>
+  )
+}
+
+/** Livraison bloquée après trop de codes faux : le client dit lui-même s'il a reçu le colis. */
+function BlockedDelivery({ orderId, vendorOrderId, shop, report, orderKey }: { orderId: number; vendorOrderId: number; shop: string; report: string; orderKey: unknown[] }) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const answer = useMutation({
+    mutationFn: async (received: boolean) => (await api.post<Order>(`/orders/${orderId}/report/`, { vendor_order: vendorOrderId, received })).data,
+    onSuccess: (order) => queryClient.setQueryData(orderKey, order),
+    onError: (e) => toast(errorMessage(e), 'error'),
+  })
+  if (report === 'not_received') {
+    return (
+      <div className="mt-3 rounded-2xl bg-red-50 p-4 text-sm text-red-800">
+        <p className="font-semibold">Signalement envoyé : vous n'avez pas reçu ce colis.</p>
+        <p>Notre équipe vous appelle. {shop} ne sera pas payée tant que ce n'est pas réglé.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-3 space-y-3 rounded-2xl bg-red-50 p-4 text-red-900">
+      <p className="flex items-center gap-2 font-semibold"><ShieldAlert className="size-5" /> Livraison bloquée par sécurité</p>
+      <p className="text-sm">Trop de codes faux ont été saisis pour ce colis. Notre équipe va vous appeler. Avez-vous le colis de {shop} entre les mains ?</p>
+      <div className="flex flex-wrap gap-2">
+        <Button loading={answer.isPending && answer.variables === true} onClick={() => window.confirm('Confirmer que vous avez bien reçu ce colis ?') && answer.mutate(true)}>
+          Oui, j'ai bien reçu mon colis
+        </Button>
+        <Button variant="outline" className="text-red-700" loading={answer.isPending && answer.variables === false} onClick={() => answer.mutate(false)}>
+          Non, je n'ai rien reçu
+        </Button>
       </div>
     </div>
   )

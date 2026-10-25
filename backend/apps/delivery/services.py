@@ -280,7 +280,7 @@ def delivered(delivery, rider, code):
     delivery = Delivery.objects.select_related("vendor_order").get(pk=delivery.pk, rider=rider)
     if delivery.status != Delivery.Status.PICKED_UP:
         raise OrderError("Récupérez d'abord le colis à la boutique.")
-    check_delivery_code(delivery.vendor_order, code)
+    check_delivery_code(delivery.vendor_order, code, by=rider.user)
     with transaction.atomic():
         delivery = Delivery.objects.select_for_update(of=("self",)).select_related("vendor_order__vendor").get(pk=delivery.pk)
         delivery.status = Delivery.Status.DELIVERED

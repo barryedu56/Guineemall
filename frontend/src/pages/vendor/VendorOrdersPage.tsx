@@ -259,11 +259,21 @@ export function VendorOrderDetailPage() {
           </Step>
         )}
 
-        {order.status === 'ready' && home && (
+        {order.code_blocked && (
+          <section className="space-y-2 rounded-3xl bg-red-50 p-5 text-red-900 ring-1 ring-red-200">
+            <h3 className="flex items-center gap-2 text-lg font-extrabold"><AlertTriangle className="size-5" /> Livraison bloquée</h3>
+            <p className="text-sm">
+              {order.delivery_code_attempts} codes faux ont été saisis. Par sécurité, l'équipe appelle le client pour savoir s'il a reçu le colis,
+              puis tranche. Vous serez prévenu de la décision.
+            </p>
+          </section>
+        )}
+
+        {order.status === 'ready' && home && !order.code_blocked && (
           <CourierStep order={order} busy={busy} run={(path, body) => run.mutate({ path, body })} onSelfDeliver={(code) => setStatus('delivered', code)} />
         )}
 
-        {order.status === 'ready' && !home && (
+        {order.status === 'ready' && !home && !order.code_blocked && (
           <Step title="Déposez le colis au point relais" text="Quand le client vient le récupérer, demandez-lui son code de livraison.">
             {order.pickup_point && (
               <div className="rounded-xl bg-background p-3 text-sm">

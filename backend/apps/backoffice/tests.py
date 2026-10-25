@@ -119,9 +119,12 @@ class MoneyTests(BackofficeTestCase):
         vo = VendorOrder.objects.create(order=order, vendor=vendor, total_amount=1000, status="ready", delivery_code_attempts=5)
         detail = self.client.get(f"/api/backoffice/orders/{order.pk}/").data
         self.assertTrue(detail["vendor_orders"][0]["code_blocked"])
-        self.client.post(f"/api/backoffice/orders/{order.pk}/unlock-code/{vo.pk}/")
+        url = f"/api/backoffice/orders/{order.pk}/delivery-decision/{vo.pk}/"
+        self.assertEqual(self.client.post(url, {"decision": "retry"}).status_code, 400)  # motif obligatoire
+        self.client.post(url, {"decision": "retry", "note": "Le client s'était trompé de code"})
         vo.refresh_from_db()
         self.assertEqual(vo.delivery_code_attempts, 0)
+        self.assertTrue(self.logged("delivery_code.retry"))
         r = self.client.post(f"/api/backoffice/orders/{order.pk}/refunded/", {"reference": "OM-REMB-1"})
         self.assertEqual(r.data["payment_status"], "refunded")
         self.assertTrue(self.logged("order.refunded"))

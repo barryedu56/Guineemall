@@ -198,6 +198,9 @@ export interface Order {
     tracking: Tracking | null
     delivery_code: string | null
     timeline: TimelineStep[]
+    delivery_code_attempts: number
+    code_blocked: boolean
+    client_report: '' | 'received' | 'not_received'
   }[]
   status_history: { status: string; note: string; created_at: string }[]
   created_at: string
@@ -277,6 +280,8 @@ export interface VendorSideOrder {
     phone: string
   }
   next_statuses: VendorOrderStatus[]
+  delivery_code_attempts: number
+  code_blocked: boolean
   created_at: string
 }
 

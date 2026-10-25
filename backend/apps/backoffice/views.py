@@ -196,7 +196,8 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, AdminViewSe
     def get_queryset(self):
         return (
             Order.objects.alive().select_related("user")
-            .prefetch_related("vendor_orders__vendor", "vendor_orders__items", "vendor_orders__delivery__rider__user")
+            .prefetch_related("vendor_orders__vendor__user", "vendor_orders__items", "vendor_orders__delivery__rider__user",
+                              "vendor_orders__code_attempts__user")
             .order_by("-created_at")
         )
 
@@ -211,12 +212,19 @@ class OrderViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, AdminViewSe
             raise ValidationError({"detail": str(e)})
         return Response(s.AdminOrderDetailSerializer(self.get_queryset().get(pk=pk)).data)
 
-    @action(detail=True, methods=["post"], url_path=r"unlock-code/(?P<vendor_order_id>\d+)")
-    def unlock_code(self, request, pk=None, vendor_order_id=None):
-        vendor_order = VendorOrder.objects.filter(order_id=pk, pk=vendor_order_id).first()
+    @action(detail=True, methods=["post"], url_path=r"delivery-decision/(?P<vendor_order_id>\d+)")
+    def delivery_decision(self, request, pk=None, vendor_order_id=None):
+        """Livraison bloquée : l'équipe tranche après avoir appelé le client. {decision: received|retry|cancel, note}"""
+        from apps.orders.disputes import admin_decision
+        from apps.orders.services import OrderError
+
+        vendor_order = VendorOrder.objects.filter(order_id=pk, pk=vendor_order_id).select_related("order__user", "vendor__user").first()
         if vendor_order is None:
             raise Http404
-        services.unlock_delivery_code(request.user, vendor_order)
+        try:
+            admin_decision(request.user, vendor_order, request.data.get("decision", ""), text(request, "note", required=True))
+        except OrderError as e:
+            raise ValidationError({"detail": str(e)})
         return Response(s.AdminOrderDetailSerializer(self.get_queryset().get(pk=pk)).data)
 
 

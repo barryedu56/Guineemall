@@ -109,8 +109,3 @@ def mark_refunded(actor, order, reference=""):
     notify(order.user, "payment", f"Remboursement de la commande #{order.id}",
            "Votre remboursement a été effectué.", f"/commandes/{order.id}")
     return order
-
-
-def unlock_delivery_code(actor, vendor_order):
-    audit(actor, "delivery_code.unlocked", vendor_order, {"attempts": vendor_order.delivery_code_attempts})
-    VendorOrder.objects.filter(pk=vendor_order.pk).update(delivery_code_attempts=0)

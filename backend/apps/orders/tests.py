@@ -169,3 +169,79 @@ class OwnShopTests(OrderTestCase):
         self.madina.status = "suspended"
         self.madina.save()
         self.assertEqual(self.add(self.riz, 1).status_code, 400)
+
+
+class BlockedDeliveryTests(OrderTestCase):
+    """Codes faux répétés : le client est prévenu, répond lui-même, l'équipe tranche."""
+
+    def setUp(self):
+        super().setUp()
+        self.add(self.riz, 1)
+        self.order_id = self.checkout("orange_money").data["id"]
+        ref = self.client.post(f"/api/orders/{self.order_id}/pay/").data["reference"]
+        self.client.post(f"/api/payments/simulation/{ref}/", {"result": "success"})
+        self.vo = VendorOrder.objects.get(order_id=self.order_id)
+        self.client.force_authenticate(self.madina.user)
+        for s in ["preparing", "ready"]:
+            self.client.post(f"/api/vendor/orders/{self.vo.pk}/status/", {"status": s})
+        self.vo.refresh_from_db()
+        self.wrong = "0000" if self.vo.delivery_code != "0000" else "1111"
+
+    def wrong_codes(self, n):
+        self.client.force_authenticate(self.madina.user)
+        for _ in range(n):
+            self.client.post(f"/api/vendor/orders/{self.vo.pk}/status/", {"status": "delivered", "code": self.wrong})
+
+    def test_client_prevenu_puis_bloque(self):
+        self.wrong_codes(1)
+        self.assertFalse(self.user.notifications.filter(title__contains="Mauvais code").exists())
+        self.wrong_codes(1)
+        self.assertTrue(self.user.notifications.filter(title__contains="Mauvais code").exists())
+        self.wrong_codes(3)
+        self.assertTrue(self.user.notifications.filter(title__contains="bloquée par sécurité").exists())
+        self.client.force_authenticate(self.user)
+        vo = self.client.get(f"/api/orders/{self.order_id}/").data["vendor_orders"][0]
+        self.assertEqual((vo["code_blocked"], vo["delivery_code_attempts"]), (True, 5))
+
+    def test_le_client_confirme_avoir_recu(self):
+        from apps.wallet.models import LedgerEntry
+
+        self.wrong_codes(5)
+        self.client.force_authenticate(self.user)
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(f"/api/orders/{self.order_id}/report/", {"vendor_order": self.vo.pk, "received": True})
+        self.assertEqual(r.data["vendor_orders"][0]["status"], "delivered")
+        self.assertTrue(LedgerEntry.objects.filter(user=self.madina.user, kind="sale").exists())  # boutique payée
+
+    def test_le_client_n_a_rien_recu_puis_l_equipe_annule(self):
+        from apps.accounts.models import User
+        from apps.orders.disputes import admin_decision
+        from apps.wallet.models import CreditEntry
+
+        self.wrong_codes(5)
+        self.client.force_authenticate(self.user)
+        self.client.post(f"/api/orders/{self.order_id}/report/", {"vendor_order": self.vo.pk, "received": False})
+        self.vo.refresh_from_db()
+        self.assertEqual(self.vo.client_report, "not_received")
+        admin = User.objects.create_superuser(email="adm@test.gn", password="x", name="Adm")
+        admin_decision(admin, self.vo, "cancel", "Client joint : rien reçu")
+        self.vo.refresh_from_db()
+        self.assertEqual(self.vo.status, "cancelled")
+        self.assertEqual(CreditEntry.balance(self.user), self.vo.total_amount)  # remboursé en avoir
+        self.riz.refresh_from_db()
+        self.assertEqual(self.riz.stock, 3)
+
+    def test_boutique_suspecte_signalee(self):
+        from apps.accounts.models import User
+
+        admin = User.objects.create_superuser(email="adm@test.gn", password="x", name="Adm")
+        self.wrong_codes(5)  # premier blocage
+        other_order = Order.objects.create(user=self.user, total_amount=1, delivery_city="Conakry", delivery_landmark="x",
+                                           delivery_phone="620000000")
+        other = VendorOrder.objects.create(order=other_order, vendor=self.madina, total_amount=1, status="ready",
+                                           delivery_code="1234", delivery_code_attempts=4)
+        from apps.orders.services import OrderError, check_delivery_code
+
+        with self.assertRaises(OrderError):
+            check_delivery_code(other, "0000", by=self.madina.user)
+        self.assertTrue(admin.notifications.filter(title__contains="Comportement suspect").exists())

@@ -1,7 +1,5 @@
 from django.contrib import admin
 
-from apps.backoffice.services import unlock_delivery_code
-
 from .models import CartItem, Order, OrderItem, OrderStatusHistory, VendorOrder
 
 
@@ -26,12 +24,8 @@ class OrderAdmin(admin.ModelAdmin):
 class VendorOrderAdmin(admin.ModelAdmin):
     list_display = ["order", "vendor", "total_amount", "status", "delivery_code_attempts"]
     list_filter = ["status"]
-    actions = ["unlock_code"]
-
-    @admin.action(description="Débloquer le code de livraison (après vérification)")
-    def unlock_code(self, request, queryset):
-        for vendor_order in queryset:
-            unlock_delivery_code(request.user, vendor_order)
+    # Livraison bloquée : décision dans le back-office (/administration/commandes), avec motif et alertes
+    readonly_fields = ["delivery_code", "delivery_code_attempts", "client_report", "client_report_at"]
 
 
 admin.site.register(OrderItem)

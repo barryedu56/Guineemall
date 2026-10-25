@@ -141,6 +141,14 @@ class VendorOrder(TimeStampedModel):
         "codes faux saisis", default=0, help_text="Remettre à 0 pour débloquer après vérification"
     )
 
+    # Livraison bloquée (codes faux) : la version du client, qui seul sait s'il a le colis
+    class ClientReport(models.TextChoices):
+        RECEIVED = "received", "Le client confirme avoir reçu le colis"
+        NOT_RECEIVED = "not_received", "Le client dit ne rien avoir reçu"
+
+    client_report = models.CharField(max_length=15, choices=ClientReport.choices, blank=True)
+    client_report_at = models.DateTimeField(null=True, blank=True)
+
     accepted_at = models.DateTimeField("acceptée le", null=True, blank=True)
     ready_at = models.DateTimeField("colis prêt le", null=True, blank=True)
 
@@ -176,6 +184,19 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.unit_price * self.quantity
+
+
+class DeliveryCodeAttempt(models.Model):
+    """Chaque code de livraison saisi (bon ou faux) : qui, quand. Sert à l'équipe en cas de blocage."""
+
+    vendor_order = models.ForeignKey(VendorOrder, on_delete=models.CASCADE, related_name="code_attempts")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    success = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "essai de code de livraison"
+        ordering = ["created_at"]
 
 
 class OrderStatusHistory(models.Model):

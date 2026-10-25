@@ -9,7 +9,7 @@ import { api, formatDate, formatPhone } from '../../lib/api'
 import { BO, useAdminAction, useAdminList } from './hooks'
 import { ListView, Toolbar } from './kit'
 import { useAsk } from './useAsk'
-import type { AdminCreditRefund, AdminDeposit, AdminOrder, AdminPayout, AdminPayoutAccount } from './types'
+import type { AdminCreditRefund, AdminDeposit, AdminOrder, AdminPayout, AdminPayoutAccount, AdminVendorOrder } from './types'
 
 export function AdminOrders() {
   const { data: config } = useSiteConfig()
@@ -106,13 +106,7 @@ export function AdminOrderDetail() {
             {vo.items.map((i, n) => <li key={n} className="flex justify-between"><span>{i.quantity} × {i.name}</span><Price amount={i.quantity * i.unit_price} /></li>)}
           </ul>
           {vo.rider && <p className="text-sm">Livreur : <strong>{vo.rider.name}</strong> ({formatPhone(vo.rider.phone)}) · {vo.rider.status}</p>}
-          {vo.code_blocked && (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
-              <KeyRound className="size-5" />
-              <span className="flex-1">Code de livraison bloqué après {vo.delivery_code_attempts} codes faux. Vérifiez auprès du client avant de débloquer.</span>
-              <Button size="sm" onClick={() => action.mutate({ id: order.id, action: `unlock-code/${vo.id}`, success: 'Code de livraison débloqué' })}>Débloquer</Button>
-            </div>
-          )}
+          {vo.code_blocked && <BlockedDeliveryPanel order={order} vo={vo} ask={ask} action={action} />}
         </section>
       ))}
       {!!order.history?.length && (
@@ -286,5 +280,54 @@ export function AdminDeposits() {
         ]}
       />
     </>
+  )
+}
+
+type AdminOrderVO = AdminVendorOrder
+
+/** Livraison bloquée : historique des codes, coordonnées, et trois décisions motivées (après appel du client). */
+function BlockedDeliveryPanel({ order, vo, ask, action }: {
+  order: AdminOrder
+  vo: AdminOrderVO
+  ask: ReturnType<typeof useAsk>[0]
+  action: ReturnType<typeof useAdminAction>
+}) {
+  const decisions = [
+    { value: 'received', label: 'Le client a reçu le colis', help: 'La commande passe en livrée sans code, la boutique peut être payée.', variant: 'primary' as const },
+    { value: 'retry', label: 'Redonner des essais', help: "Le client s'était trompé : le code peut être saisi à nouveau.", variant: 'outline' as const },
+    { value: 'cancel', label: 'Annuler la livraison', help: "Le client n'a rien reçu : stock remis, remboursement en avoir si payé en ligne.", variant: 'danger' as const },
+  ]
+  async function decide(d: (typeof decisions)[number]) {
+    const note = await ask({ title: d.label, label: `${d.help} Motif (ce que le client a dit au téléphone) — envoyé au client et à la boutique`, confirm: 'Confirmer', danger: d.value === 'cancel', required: true })
+    if (note) action.mutate({ id: order.id, action: `delivery-decision/${vo.id}`, body: { decision: d.value, note }, success: 'Décision enregistrée, client et boutique prévenus' })
+  }
+  return (
+    <div className="space-y-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
+      <p className="flex items-center gap-2 font-bold"><KeyRound className="size-5" /> Livraison bloquée : {vo.delivery_code_attempts} codes faux</p>
+      {vo.client_report && (
+        <p className={`rounded-xl p-2 font-semibold ${vo.client_report === 'not_received' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>{vo.client_report_label}</p>
+      )}
+      <p className="font-medium">Appelez d'abord le client, puis la boutique :</p>
+      <div className="flex flex-wrap gap-4">
+        <a href={`tel:${order.delivery_phone}`} className="font-semibold text-primary-dark">Client {order.client.name} · {formatPhone(order.delivery_phone)}</a>
+        <a href={`tel:${vo.shop_phone}`} className="font-semibold text-primary-dark">{vo.shop_name} · {formatPhone(vo.shop_phone)}</a>
+        {vo.rider && <a href={`tel:${vo.rider.phone}`} className="font-semibold text-primary-dark">Livreur {vo.rider.name} · {formatPhone(vo.rider.phone)}</a>}
+      </div>
+      <details>
+        <summary className="cursor-pointer font-medium">Codes saisis ({vo.code_attempts.length})</summary>
+        <ol className="mt-2 space-y-1">
+          {vo.code_attempts.map((a, i) => (
+            <li key={i} className="flex flex-wrap gap-x-3">
+              <span className="text-ink/50">{formatDate(a.at)}</span>
+              <span className={a.success ? 'text-green-700' : 'text-red-700'}>{a.success ? 'bon code' : 'code faux'}</span>
+              <span>par {a.by ?? 'compte supprimé'}{a.role && ` (${a.role})`}</span>
+            </li>
+          ))}
+        </ol>
+      </details>
+      <div className="flex flex-wrap gap-2">
+        {decisions.map((d) => <Button key={d.value} size="sm" variant={d.variant} onClick={() => decide(d)}>{d.label}</Button>)}
+      </div>
+    </div>
   )
 }

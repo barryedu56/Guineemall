@@ -99,22 +99,33 @@ class AdminVendorOrderSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField()
     code_blocked = serializers.SerializerMethodField()
     rider = serializers.SerializerMethodField()
+    shop_phone = serializers.CharField(source="vendor.contact_phone", read_only=True)
+    client_report_label = serializers.CharField(source="get_client_report_display", read_only=True)
+    code_attempts = serializers.SerializerMethodField()
 
     class Meta:
         model = VendorOrder
         fields = [
-            "id", "shop_name", "subtotal", "delivery_fee", "vendor_discount", "platform_discount", "total_amount",
-            "status", "status_label", "delivery_code_attempts", "code_blocked", "delivered_at", "received_at",
-            "funds_released_at", "items", "rider",
+            "id", "shop_name", "shop_phone", "subtotal", "delivery_fee", "vendor_discount", "platform_discount", "total_amount",
+            "status", "status_label", "delivery_code_attempts", "code_blocked", "client_report", "client_report_label",
+            "code_attempts", "delivered_at", "received_at", "funds_released_at", "items", "rider",
+        ]
+
+    def get_code_attempts(self, vo):
+        """Qui a saisi quel type de code, et quand (le code lui-même n'est jamais stocké)."""
+        return [
+            {"by": a.user.name if a.user else None, "role": a.user.get_role_display() if a.user else None,
+             "success": a.success, "at": a.created_at}
+            for a in vo.code_attempts.all()
         ]
 
     def get_items(self, vo):
         return [{"name": i.product_name, "quantity": i.quantity, "unit_price": i.unit_price} for i in vo.items.all()]
 
     def get_code_blocked(self, vo):
-        from django.conf import settings
+        from apps.orders.disputes import is_blocked
 
-        return vo.delivery_code_attempts >= settings.DELIVERY_CODE_MAX_ATTEMPTS
+        return is_blocked(vo)
 
     def get_rider(self, vo):
         delivery = getattr(vo, "delivery", None)

@@ -74,6 +74,10 @@ export interface AdminVendorOrder {
   status_label: string
   delivery_code_attempts: number
   code_blocked: boolean
+  shop_phone: string
+  client_report: string
+  client_report_label: string
+  code_attempts: { by: string | null; role: string | null; success: boolean; at: string }[]
   funds_released_at: string | null
   items: { name: string; quantity: number; unit_price: number }[]
   rider: { name: string; phone: string; status: string } | null
