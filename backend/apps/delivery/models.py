@@ -120,6 +120,7 @@ class DeliveryMessage(models.Model):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     content = models.TextField(blank=True)
     image = models.ImageField(upload_to="delivery_chat/", blank=True)
+    audio = models.FileField("message vocal", upload_to="delivery_chat/", blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -236,6 +236,7 @@ export interface DeliveryMessage {
   mine: boolean
   content: string
   image: string | null
+  audio: string | null
   read_at: string | null
   created_at: string
 }

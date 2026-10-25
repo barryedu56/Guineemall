@@ -5,6 +5,8 @@ import { useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'rea
 import { api, directionsUrl, errorMessage, formatTime, whatsappUrl } from '../lib/api'
 import type { DeliveryMessage, TimelineStep } from '../lib/types'
 import { ErrorBox } from './ui'
+import { useVoiceRecorder } from '../lib/useVoiceRecorder'
+import { MicButton, RecordingBar } from './VoiceRecorder'
 
 /** Étapes de la commande, les mêmes pour le client, la boutique et le livreur. */
 export function Timeline({ steps }: { steps: TimelineStep[] }) {
@@ -105,10 +107,11 @@ export function DeliveryChat({ deliveryId, partner, closed }: { deliveryId: numb
     queryFn: async () => (await api.get<DeliveryMessage[]>(`/delivery/${deliveryId}/messages/`)).data,
   })
   const send = useMutation({
-    mutationFn: async (payload: { content?: string; image?: File }) => {
-      if (payload.image) {
+    mutationFn: async (payload: { content?: string; image?: File; audio?: File }) => {
+      const file = payload.image ? ['image', payload.image] as const : payload.audio ? ['audio', payload.audio] as const : null
+      if (file) {
         const data = new FormData()
-        data.append('image', payload.image)
+        data.append(file[0], file[1])
         return api.post(`/delivery/${deliveryId}/messages/`, data)
       }
       return api.post(`/delivery/${deliveryId}/messages/`, payload)
@@ -120,6 +123,7 @@ export function DeliveryChat({ deliveryId, partner, closed }: { deliveryId: numb
     },
     onError: (e) => setError(errorMessage(e)),
   })
+  const voice = useVoiceRecorder((audio) => send.mutate({ audio }), setError)
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'nearest' })
   }, [messages.length])
@@ -139,7 +143,7 @@ export function DeliveryChat({ deliveryId, partner, closed }: { deliveryId: numb
       <div className="max-h-80 min-h-32 space-y-2 overflow-y-auto p-3">
         {messages.length === 0 && (
           <p className="py-6 text-center text-sm text-ink/50">
-            Écrivez à {partner} : où récupérer le colis, à qui le remettre, un retard…
+            Écrivez ou envoyez un vocal à {partner} : où récupérer le colis, à qui le remettre, un retard…
           </p>
         )}
         {messages.map((m) => (
@@ -150,6 +154,7 @@ export function DeliveryChat({ deliveryId, partner, closed }: { deliveryId: numb
                   <img src={m.image} alt="Photo envoyée" className="mb-1 max-h-48 rounded-xl object-cover" />
                 </a>
               )}
+              {m.audio && <audio controls src={m.audio} className="h-10 max-w-60" />}
               {m.content && <p className="whitespace-pre-wrap break-words">{m.content}</p>}
               <p className={`mt-0.5 text-right text-[11px] ${m.mine ? 'text-white/70' : 'text-ink/45'}`}>
                 {formatTime(m.created_at)}
@@ -164,29 +169,39 @@ export function DeliveryChat({ deliveryId, partner, closed }: { deliveryId: numb
         <p className="border-t border-ink/10 p-3 text-center text-xs text-ink/50">Course terminée : discussion fermée.</p>
       ) : (
         <form onSubmit={submit} className="flex items-center gap-2 border-t border-ink/10 bg-surface p-2">
-          <label className="cursor-pointer rounded-full p-2 text-ink/60 hover:bg-ink/5" aria-label="Envoyer une photo">
-            <ImagePlus className="size-5" />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) send.mutate({ image: file })
-                e.target.value = ''
-              }}
-            />
-          </label>
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Votre message…"
-            maxLength={1000}
-            className="min-w-0 flex-1 rounded-full bg-background px-4 py-2 text-sm outline-none ring-1 ring-ink/10 focus:ring-primary-dark"
-          />
-          <button type="submit" disabled={!text.trim() || send.isPending} className="rounded-full bg-primary-dark p-2.5 text-white disabled:opacity-40" aria-label="Envoyer">
-            <Send className="size-4" />
-          </button>
+          {voice.recording ? (
+            <RecordingBar seconds={voice.seconds} onCancel={voice.cancel} onSend={voice.send} />
+          ) : (
+            <>
+              <label className="cursor-pointer rounded-full p-2 text-ink/60 hover:bg-ink/5" aria-label="Envoyer une photo">
+                <ImagePlus className="size-5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) send.mutate({ image: file })
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Votre message…"
+                maxLength={1000}
+                className="min-w-0 flex-1 rounded-full bg-background px-4 py-2 text-sm outline-none ring-1 ring-ink/10 focus:ring-primary-dark"
+              />
+              {text.trim() ? (
+                <button type="submit" disabled={send.isPending} className="rounded-full bg-primary-dark p-2.5 text-white disabled:opacity-40" aria-label="Envoyer">
+                  <Send className="size-4" />
+                </button>
+              ) : (
+                <MicButton onClick={voice.start} disabled={send.isPending} />
+              )}
+            </>
+          )}
         </form>
       )}
       <ErrorBox message={error} />

@@ -333,7 +333,7 @@ def send_message(delivery, sender, serializer):
         from_shop = sender.id == delivery.vendor_order.vendor.user_id
         name = delivery.vendor_order.vendor.shop_name if from_shop else sender.name
         notify(partner, "message", f"Message de {name} – commande #{delivery.vendor_order.order_id}",
-               message.content[:120] or "📷 Photo", rider_link(delivery) if from_shop else vendor_link(delivery),
+               message.content[:120] or ("🎤 Message vocal" if message.audio else "📷 Photo"), rider_link(delivery) if from_shop else vendor_link(delivery),
                whatsapp=False)
     return message
 

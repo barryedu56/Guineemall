@@ -234,6 +234,15 @@ class RiderFlowTests(OrderTestCase):
         messages = self.client.get(url).data
         self.assertEqual((len(messages), messages[0]["mine"]), (1, False))
         self.client.post(url, {"content": "J'arrive dans 10 minutes"})
+        # Message vocal (enregistrement WebM du navigateur) ; une page web déguisée est refusée
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        voice = SimpleUploadedFile("vocal.webm", bytes.fromhex("1a45dfa3") + b"\x00" * 64, content_type="audio/webm")
+        r = self.client.post(url, {"audio": voice}, format="multipart")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertRegex(r.data["audio"], r"/delivery_chat/[0-9a-f]{32}\.webm$")
+        fake = SimpleUploadedFile("vocal.webm", b"<html><script>alert(1)</script></html>", content_type="audio/webm")
+        self.assertEqual(self.client.post(url, {"audio": fake}, format="multipart").status_code, 400)
         # Un inconnu ne lit pas la discussion
         self.client.force_authenticate(self.make_client("curieux@test.gn"))
         self.assertEqual(self.client.get(url).status_code, 404)

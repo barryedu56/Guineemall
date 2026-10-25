@@ -1,10 +1,12 @@
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import { ArrowLeft, BadgeCheck, Check, CheckCheck, ImagePlus, Loader2, MessageCircle, Mic, Send, Square } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Check, CheckCheck, ImagePlus, Loader2, MessageCircle, Mic, Send } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import Price from '../../components/Price'
 import { ShopAvatar } from '../../components/Statuts'
+import { RecordingBar } from '../../components/VoiceRecorder'
+import { useVoiceRecorder } from '../../lib/useVoiceRecorder'
 import { Empty, ErrorBox, Spinner } from '../../components/ui'
 import { useAuth } from '../../context/auth'
 import { useRealtime } from '../../context/realtime'
@@ -174,7 +176,6 @@ function Composer({ conversationId, queryKey }: { conversationId: number; queryK
   const queryClient = useQueryClient()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [recording, setRecording] = useState<MediaRecorder | null>(null)
   const [error, setError] = useState<string | null>(null)
   const lastTyping = useRef(0)
 
@@ -208,29 +209,7 @@ function Composer({ conversationId, queryKey }: { conversationId: number; queryK
     data.append('attachment', file)
     send(data)
   }
-
-  async function toggleRecording() {
-    if (recording) {
-      recording.stop()
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      const chunks: Blob[] = []
-      recorder.ondataavailable = (e) => chunks.push(e.data)
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop())
-        setRecording(null)
-        const type = recorder.mimeType || 'audio/webm'
-        sendFile(new File([new Blob(chunks, { type })], `vocal.${type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm'}`, { type }))
-      }
-      recorder.start()
-      setRecording(recorder)
-    } catch {
-      setError("Impossible d'accéder au micro.")
-    }
-  }
+  const voice = useVoiceRecorder(sendFile, setError)
 
   return (
     <form onSubmit={submit} className="border-t border-ink/5 p-2">
@@ -240,8 +219,8 @@ function Composer({ conversationId, queryKey }: { conversationId: number; queryK
           <ImagePlus className="size-5" />
           <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && sendFile(e.target.files[0])} />
         </label>
-        {recording ? (
-          <p className="flex-1 animate-pulse px-3 text-red-600">● Enregistrement… touchez ■ pour envoyer</p>
+        {voice.recording ? (
+          <RecordingBar seconds={voice.seconds} onCancel={voice.cancel} onSend={voice.send} />
         ) : (
           <input
             value={text}
@@ -261,14 +240,11 @@ function Composer({ conversationId, queryKey }: { conversationId: number; queryK
             {sending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={toggleRecording}
-            className={`rounded-full p-2.5 ${recording ? 'bg-red-600 text-white' : 'bg-primary hover:bg-primary-hover'}`}
-            aria-label={recording ? "Arrêter et envoyer" : 'Message vocal'}
-          >
-            {recording ? <Square className="size-5" /> : <Mic className="size-5" />}
-          </button>
+          !voice.recording && (
+            <button type="button" onClick={voice.start} className="rounded-full bg-primary p-2.5 hover:bg-primary-hover" aria-label="Message vocal">
+              <Mic className="size-5" />
+            </button>
+          )
         )}
       </div>
     </form>

@@ -192,15 +192,20 @@ class DeliveryMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DeliveryMessage
-        fields = ["id", "sender", "sender_name", "mine", "content", "image", "read_at", "created_at"]
+        fields = ["id", "sender", "sender_name", "mine", "content", "image", "audio", "read_at", "created_at"]
         read_only_fields = ["sender", "read_at"]
 
     def get_mine(self, message):
         return message.sender_id == self.context["request"].user.id
 
     def validate(self, attrs):
-        if not attrs.get("content", "").strip() and not attrs.get("image"):
+        if not attrs.get("content", "").strip() and not attrs.get("image") and not attrs.get("audio"):
             raise serializers.ValidationError("Message vide.")
+        if attrs.get("audio"):
+            try:
+                check_upload(attrs["audio"], {"audio"}, max_mb=15)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({"audio": e.messages[0]})
         if attrs.get("image"):
             try:
                 check_upload(attrs["image"], {"image"}, max_mb=15)
